@@ -477,7 +477,10 @@
           <span class="chip hi" id="ovms-ver-badge" style="cursor:pointer" onclick="openUpdaterModal()" title="点击管理 OpenVINO 版本检测与自动/手动更新">OVMS 版本检测中...</span>
           <span class="chip warn" id="ovms-update-pill" style="display:none;cursor:pointer" onclick="openUpdaterModal()">⬆ 发现新版本</span>
         </div>
-        <div class="brand-sub" id="endpoint-label">REST API: http://127.0.0.1:8000/v3 · Cherry Studio 直连就绪</div>
+        <div class="brand-sub" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span id="endpoint-label">REST API: http://127.0.0.1:8000/v3 · Cherry Studio 直连就绪</span>
+          <button class="btn btn-sm" style="padding:1px 7px;font-size:11px;line-height:1.3" onclick="openApiEndpointModal()" title="修改 OVMS REST API 监听地址与端口">✎ 更改地址</button>
+        </div>
       </div>
     </div>
 
@@ -490,7 +493,9 @@
       <button class="btn btn-danger" id="btn-stop" onclick="serverAction('stop')">■ 停止并释放内存</button>
       <button class="btn" id="btn-restart" onclick="serverAction('restart')">↻ 重启服务</button>
       <button class="btn" onclick="openUpdaterModal()">🔄 版本更新</button>
-      <button class="btn" onclick="copyEndpoint()">📋 复制 API 地址</button>
+      <button class="btn" onclick="openApiEndpointModal()" title="配置 REST API 监听地址与端口">🌐 API 地址</button>
+      <button class="btn" onclick="copyEndpoint()">📋 复制地址</button>
+      <button class="btn btn-danger" onclick="openShutdownStudioModal()" title="关闭并退出 OpenVINO Studio 控制台">⏻ 退出 Studio</button>
     </div>
   </header>
 
@@ -786,6 +791,13 @@
               <input type="number" id="setting-shared-vram-gb" value="16" min="2" max="128" step="0.5" style="width:110px" />
               <button class="btn btn-sm" onclick="document.getElementById('setting-shared-vram-gb').value=16">重置 16GB</button>
               <button class="btn btn-sm btn-primary" style="margin-left:auto" onclick="saveGlobalSettings()">💾 保存设置</button>
+            </div>
+          </div>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+            <span class="metric-sub" id="setting-api-summary">REST API: http://127.0.0.1:8000/v3</span>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-sm" onclick="openApiEndpointModal()">🌐 更改 API 地址</button>
+              <button class="btn btn-sm btn-danger" onclick="openShutdownStudioModal()">⏻ 退出 Studio</button>
             </div>
           </div>
         </div>
@@ -1124,6 +1136,107 @@
     </div>
   </div>
 
+  <!-- Modal 7: Customize REST API & gRPC Bind Address and Ports -->
+  <div class="modal-backdrop" id="api-modal">
+    <div class="modal" style="max-width:600px">
+      <div class="modal-header">
+        <span>🌐 更改 OpenVINO REST API 地址与端口</span>
+        <button class="btn btn-sm" onclick="closeApiEndpointModal()">✕ 关闭</button>
+      </div>
+      <div class="modal-body">
+        <p class="metric-sub">
+          配置 OpenVINO Model Server 的 REST API 监听地址（<code>--rest_bind_address</code>）与端口（<code>--rest_port</code>）。支持直接粘贴完整地址（如 <code>http://127.0.0.1:8000/v3</code> 或 <code>0.0.0.0:8080</code>），也可分别设置主机与端口。
+        </p>
+
+        <div class="field">
+          <label>快捷地址输入 / 实时预览 (支持直接输入 IP:端口 或完整 URL)</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="text" id="api-quick-input" placeholder="http://127.0.0.1:8000/v3" oninput="syncApiFieldsFromQuickInput()" style="flex:1;font-family:Consolas,monospace;font-weight:600" />
+            <button class="btn" onclick="resetDefaultApiEndpoint()">恢复默认 (8000)</button>
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <div class="field">
+            <label>REST 监听主机地址 (<code>--rest_bind_address</code>)</label>
+            <input type="text" id="api-bind-host" value="127.0.0.1" oninput="syncApiPreviewFromFields()" style="font-family:Consolas,monospace" />
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+              <button class="btn btn-sm" onclick="setApiHostPreset('127.0.0.1')">127.0.0.1 (仅本机)</button>
+              <button class="btn btn-sm" onclick="setApiHostPreset('0.0.0.0')">0.0.0.0 (开放局域网)</button>
+              <button class="btn btn-sm" id="btn-lan-ip-preset" onclick="setApiHostPreset(latestState?.server?.lan_ip || '127.0.0.1')">本机局域网 IP</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>REST API 端口 (<code>--rest_port</code>)</label>
+            <input type="number" id="api-rest-port" value="8000" min="1" max="65535" oninput="syncApiPreviewFromFields()" style="font-family:Consolas,monospace" />
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+              <button class="btn btn-sm" onclick="setApiPortPreset(8000)">8000 (默认)</button>
+              <button class="btn btn-sm" onclick="setApiPortPreset(8080)">8080</button>
+              <button class="btn btn-sm" onclick="setApiPortPreset(11434)">11434</button>
+              <button class="btn btn-sm" onclick="setApiPortPreset(5000)">5000</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>gRPC 服务端口 (<code>--port</code>，不能与 REST 端口相同)</label>
+          <input type="number" id="api-grpc-port" value="9000" min="1" max="65535" style="width:180px;font-family:Consolas,monospace" />
+        </div>
+
+        <div style="background:rgba(15,23,42,0.7);border:1px solid var(--border);border-radius:9px;padding:11px 14px;display:flex;flex-direction:column;gap:8px;font-size:12.5px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+            <span>💻 <strong>本机客户端接入地址 (Cherry Studio)：</strong><code id="api-preview-local" style="color:#38bdf8;font-family:Consolas,monospace">http://127.0.0.1:8000/v3</code></span>
+            <button class="btn btn-sm" onclick="copyTextValue(document.getElementById('api-preview-local').textContent, '已复制本机 API 地址')">📋 复制</button>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+            <span>📡 <strong>局域网其他设备接入地址：</strong><code id="api-preview-lan" style="color:#34d399;font-family:Consolas,monospace">http://127.0.0.1:8000/v3</code></span>
+            <button class="btn btn-sm" onclick="copyTextValue(document.getElementById('api-preview-lan').textContent, '已复制局域网 API 地址')">📋 复制</button>
+          </div>
+        </div>
+
+        <label style="display:flex;align-items:center;gap:9px;cursor:pointer;font-size:13px;color:var(--text-0);margin-top:2px">
+          <input type="checkbox" id="api-auto-restart" checked style="width:16px;height:16px" />
+          <span>若 OpenVINO 服务正在运行，保存后<strong>自动重启服务</strong>以使新的 REST API 地址立即生效</span>
+        </label>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeApiEndpointModal()">取消</button>
+        <button class="btn btn-primary" id="btn-save-api-modal" onclick="saveApiEndpointModal()">💾 保存并应用地址</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 8: Shut Down OpenVINO Studio Application -->
+  <div class="modal-backdrop" id="shutdown-studio-modal">
+    <div class="modal" style="max-width:540px">
+      <div class="modal-header">
+        <span>⏻ 关闭并退出 OpenVINO Studio</span>
+        <button class="btn btn-sm" onclick="closeShutdownStudioModal()">✕ 取消</button>
+      </div>
+      <div class="modal-body">
+        <p class="metric-sub" id="shutdown-studio-status-desc" style="font-size:13.5px;color:var(--text-0)">
+          请选择退出 OpenVINO Studio 控制台的方式：
+        </p>
+
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <button class="btn btn-danger" style="justify-content:flex-start;padding:13px 16px;text-align:left;display:flex;flex-direction:column;align-items:flex-start;gap:4px" onclick="confirmShutdownStudio(true)">
+            <span style="font-size:14px;font-weight:700">🛑 停止 OVMS 推理服务并完全退出 Studio (推荐 · 释放全部显存/内存)</span>
+            <span style="font-size:12px;color:#fecaca;font-weight:400">立即终止后台 ovms.exe 释放所有模型占用的系统内存与核显共享显存，随后关闭 OpenVINO Studio 后台服务与窗口。</span>
+          </button>
+
+          <button class="btn" style="justify-content:flex-start;padding:13px 16px;text-align:left;display:flex;flex-direction:column;align-items:flex-start;gap:4px" onclick="confirmShutdownStudio(false)">
+            <span style="font-size:14px;font-weight:700;color:#38bdf8">🌙 仅退出 Studio 控制台 (保持 OVMS 推理服务在后台继续运行)</span>
+            <span style="font-size:12px;color:var(--text-2);font-weight:400">仅关闭当前 OpenVINO Studio 监控面板与 Web 进程（释放 18080 端口），保持已加载的模型继续为 Cherry Studio 提供 API 服务。</span>
+          </button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeShutdownStudioModal()">返回控制台</button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 
   <script>
@@ -1167,6 +1280,12 @@
       const url = latestState?.server?.endpoint_v3 || 'http://127.0.0.1:8000/v3';
       navigator.clipboard.writeText(url);
       showToast(`已复制 OpenAI 兼容地址: ${url}`);
+    }
+
+    function copyTextValue(val, msg = '已复制') {
+      if (!val) return;
+      navigator.clipboard.writeText(val);
+      showToast(`${msg}: ${val}`);
     }
 
     function renderTelemetryChart(history) {
@@ -1410,6 +1529,28 @@
         if (rootLabel) rootLabel.textContent = curRoot;
         const cacheDirLabel = document.getElementById('cache-dir-label');
         if (cacheDirLabel && srv.settings?.cache_dir) cacheDirLabel.textContent = srv.settings.cache_dir;
+
+        // Dynamic REST API Endpoint label & LAN indicator
+        const restBind = srv.rest_bind_address || srv.settings?.rest_bind_address || '127.0.0.1';
+        const restPort = srv.rest_port || srv.settings?.rest_port || 8000;
+        const epV3 = srv.endpoint_v3 || `http://127.0.0.1:${restPort}/v3`;
+        const lanEpV3 = srv.lan_endpoint_v3 || epV3;
+        const epLabel = document.getElementById('endpoint-label');
+        if (epLabel) {
+          if (restBind === '0.0.0.0') {
+            epLabel.textContent = `REST API: ${epV3} (局域网开放: ${lanEpV3})`;
+          } else {
+            epLabel.textContent = `REST API: ${epV3} · Cherry Studio 直连就绪`;
+          }
+        }
+        const settingApiSummary = document.getElementById('setting-api-summary');
+        if (settingApiSummary) {
+          settingApiSummary.textContent = `REST API: ${restBind}:${restPort} (gRPC: ${srv.grpc_port || 9000})`;
+        }
+        const lanBtn = document.getElementById('btn-lan-ip-preset');
+        if (lanBtn && srv.lan_ip) {
+          lanBtn.textContent = `${srv.lan_ip} (本机局域网IP)`;
+        }
 
         renderUpdaterUI(srv.updater, srv.settings);
         renderTelemetryChart(data.telemetry.history);
@@ -2079,8 +2220,169 @@ node: {
       }
     }
 
+    function openApiEndpointModal() {
+      const srv = latestState?.server || {};
+      const settings = srv.settings || {};
+      const host = srv.rest_bind_address || settings.rest_bind_address || '127.0.0.1';
+      const port = srv.rest_port || settings.rest_port || 8000;
+      const grpcPort = srv.grpc_port || settings.grpc_port || 9000;
+
+      document.getElementById('api-bind-host').value = host;
+      document.getElementById('api-rest-port').value = port;
+      document.getElementById('api-grpc-port').value = grpcPort;
+      syncApiPreviewFromFields();
+      document.getElementById('api-modal').classList.add('open');
+    }
+
+    function closeApiEndpointModal() {
+      document.getElementById('api-modal').classList.remove('open');
+    }
+
+    function setApiHostPreset(host) {
+      document.getElementById('api-bind-host').value = host || '127.0.0.1';
+      syncApiPreviewFromFields();
+    }
+
+    function setApiPortPreset(port) {
+      document.getElementById('api-rest-port').value = port;
+      const grpcEl = document.getElementById('api-grpc-port');
+      if (Number(grpcEl.value) === Number(port)) {
+        grpcEl.value = Number(port) + 1000;
+      }
+      syncApiPreviewFromFields();
+    }
+
+    function resetDefaultApiEndpoint() {
+      document.getElementById('api-bind-host').value = '127.0.0.1';
+      document.getElementById('api-rest-port').value = 8000;
+      document.getElementById('api-grpc-port').value = 9000;
+      syncApiPreviewFromFields();
+    }
+
+    function syncApiPreviewFromFields() {
+      const host = (document.getElementById('api-bind-host').value || '127.0.0.1').trim();
+      const port = Number(document.getElementById('api-rest-port').value || 8000) || 8000;
+      const lanIp = latestState?.server?.lan_ip || '127.0.0.1';
+      const localHost = (host === '0.0.0.0' || host === '::' || host === '*') ? '127.0.0.1' : host;
+      const lanHost = (host === '0.0.0.0' || host === '::' || host === '*') ? lanIp : host;
+
+      const quickEl = document.getElementById('api-quick-input');
+      if (document.activeElement !== quickEl) {
+        quickEl.value = `http://${host}:${port}/v3`;
+      }
+      document.getElementById('api-preview-local').textContent = `http://${localHost}:${port}/v3`;
+      document.getElementById('api-preview-lan').textContent = `http://${lanHost}:${port}/v3`;
+    }
+
+    function syncApiFieldsFromQuickInput() {
+      const raw = (document.getElementById('api-quick-input').value || '').trim();
+      if (!raw) return;
+      try {
+        const normalized = raw.includes('://') ? raw : `http://${raw}`;
+        const u = new URL(normalized);
+        if (u.hostname) {
+          document.getElementById('api-bind-host').value = u.hostname === 'localhost' ? '127.0.0.1' : u.hostname;
+        }
+        if (u.port) {
+          document.getElementById('api-rest-port').value = Number(u.port);
+        }
+        syncApiPreviewFromFields();
+      } catch (_) {
+        // Ignore partial input while typing
+      }
+    }
+
+    async function saveApiEndpointModal() {
+      const host = (document.getElementById('api-bind-host').value || '127.0.0.1').trim();
+      const restPort = Number(document.getElementById('api-rest-port').value || 8000);
+      const grpcPort = Number(document.getElementById('api-grpc-port').value || 9000);
+      const autoRestart = document.getElementById('api-auto-restart').checked;
+
+      if (!host) {
+        return showToast('请输入有效的监听主机地址');
+      }
+      if (isNaN(restPort) || restPort < 1 || restPort > 65535) {
+        return showToast('请输入有效的 REST API 端口 (1 ~ 65535)');
+      }
+      if (isNaN(grpcPort) || grpcPort < 1 || grpcPort > 65535) {
+        return showToast('请输入有效的 gRPC 端口 (1 ~ 65535)');
+      }
+      if (restPort === grpcPort) {
+        return showToast('REST 端口与 gRPC 端口不能相同');
+      }
+
+      const btn = document.getElementById('btn-save-api-modal');
+      btn.disabled = true;
+      showToast('正在保存 REST API 地址配置...');
+      try {
+        const res = await apiCall('/api/settings', 'POST', {
+          rest_bind_address: host,
+          grpc_bind_address: host,
+          rest_port: restPort,
+          grpc_port: grpcPort,
+          restart_if_running: autoRestart,
+        });
+        if (res.ok) {
+          closeApiEndpointModal();
+          await fetchOverview();
+          showToast(
+            res.restarted
+              ? `✔ REST API 已更新为 ${res.server?.endpoint_v3} 并自动重启 OVMS 生效`
+              : `✔ REST API 地址已更新为 ${res.server?.endpoint_v3}`
+          );
+        } else {
+          showToast(res.error || '保存失败', 4000);
+        }
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function openShutdownStudioModal() {
+      const running = Boolean(latestState?.server?.running);
+      const desc = document.getElementById('shutdown-studio-status-desc');
+      if (desc) {
+        desc.innerHTML = running
+          ? `当前 OpenVINO 推理服务 <strong>正在运行中</strong>（占用显存/内存约 <strong>${(latestState?.telemetry?.current?.memory?.ovms_ram_gb || 0).toFixed(2)} GB</strong>）。请选择退出 OpenVINO Studio 控制台的方式：`
+          : `当前 OpenVINO 推理服务处于 <strong>已停止</strong> 状态。请选择退出 OpenVINO Studio 控制台的方式：`;
+      }
+      document.getElementById('shutdown-studio-modal').classList.add('open');
+    }
+
+    function closeShutdownStudioModal() {
+      document.getElementById('shutdown-studio-modal').classList.remove('open');
+    }
+
+    async function confirmShutdownStudio(stopOvms = true) {
+      try {
+        showToast(stopOvms ? '正在停止 OVMS 并退出 OpenVINO Studio...' : '正在关闭 OpenVINO Studio 控制台...');
+        if (window._overviewTimer) {
+          clearInterval(window._overviewTimer);
+        }
+        const res = await apiCall('/api/studio/shutdown', 'POST', { stop_ovms: stopOvms });
+        closeShutdownStudioModal();
+        document.body.innerHTML = `
+          <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0b0f19;color:#f8fafc;font-family:system-ui,sans-serif;padding:24px">
+            <div style="max-width:480px;background:#111827;border:1px solid rgba(148,163,184,0.2);border-radius:16px;padding:28px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.6)">
+              <div style="font-size:38px;margin-bottom:12px">⏻</div>
+              <h2 style="font-size:18px;margin-bottom:8px">OpenVINO Studio 已安全退出</h2>
+              <p style="font-size:13.5px;color:#94a3b8;line-height:1.6;margin-bottom:18px">
+                ${res.message || '后台控制中心进程已关闭，您现在可以关闭此窗口。'}
+              </p>
+              <button onclick="window.close()" style="background:#38bdf8;color:#020617;border:none;padding:9px 20px;border-radius:8px;font-weight:700;cursor:pointer">关闭窗口</button>
+            </div>
+          </div>
+        `;
+        setTimeout(() => {
+          try { window.close(); } catch (_) {}
+        }, 400);
+      } catch (e) {
+        showToast('退出请求已发送，您可以直接关闭窗口');
+      }
+    }
+
     fetchOverview();
-    setInterval(fetchOverview, 1500);
+    window._overviewTimer = setInterval(fetchOverview, 1500);
   </script>
 </body>
 </html>

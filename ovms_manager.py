@@ -3,6 +3,7 @@ import json
 import os
 import re
 import shutil
+import socket
 import subprocess
 import threading
 import time
@@ -367,7 +368,9 @@ class OvmsManager:
                 "config_json_path": DEFAULT_CONFIG_JSON,
                 "models_root": DEFAULT_MODELS_ROOT,
                 "cache_dir": DEFAULT_CACHE_DIR,
+                "rest_bind_address": "127.0.0.1",
                 "rest_port": 8000,
+                "grpc_bind_address": "127.0.0.1",
                 "grpc_port": 9000,
                 "log_level": "INFO",
                 "file_system_poll_wait_seconds": 1,
@@ -512,10 +515,35 @@ class OvmsManager:
 
         return self.get_models_with_live_status()
 
+    def _get_lan_ip(self) -> str:
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                s.settimeout(0.2)
+                s.connect(("8.8.8.8", 80))
+                ip = s.getsockname()[0]
+                if ip and not ip.startswith("127."):
+                    return ip
+        except Exception:
+            pass
+        try:
+            ip = socket.gethostbyname(socket.gethostname())
+            if ip and not ip.startswith("127."):
+                return ip
+        except Exception:
+            pass
+        return "127.0.0.1"
+
+    def get_probe_host(self) -> str:
+        bind_addr = str(self.state["settings"].get("rest_bind_address") or "127.0.0.1").strip()
+        if not bind_addr or bind_addr in ("0.0.0.0", "::", "*", "localhost"):
+            return "127.0.0.1"
+        return bind_addr
+
     def get_live_ovms_states(self) -> Dict[str, Dict[str, Any]]:
-        """Query http://127.0.0.1:{rest_port}/v1/config to get real-time OVMS servable state."""
+        """Query http://{probe_host}:{rest_port}/v1/config to get real-time OVMS servable state."""
+        host = self.get_probe_host()
         port = self.state["settings"]["rest_port"]
-        url = f"http://127.0.0.1:{port}/v1/config"
+        url = f"http://{host}:{port}/v1/config"
         states: Dict[str, Dict[str, Any]] = {}
         try:
             req = urllib.request.Request(url, method="GET")
@@ -534,8 +562,9 @@ class OvmsManager:
 
     def trigger_ovms_config_reload(self) -> Dict[str, Any]:
         """Call POST /v1/config/reload so OVMS immediately loads/unloads changed models."""
+        host = self.get_probe_host()
         port = self.state["settings"]["rest_port"]
-        url = f"http://127.0.0.1:{port}/v1/config/reload"
+        url = f"http://{host}:{port}/v1/config/reload"
         try:
             req = urllib.request.Request(url, data=b"", method="POST")
             with urllib.request.urlopen(req, timeout=5.0) as resp:
@@ -600,15 +629,27 @@ class OvmsManager:
             except Exception:
                 pass
 
+        rest_bind = str(self.state["settings"].get("rest_bind_address") or "127.0.0.1").strip()
+        rest_port = int(self.state["settings"].get("rest_port") or 8000)
+        grpc_bind = str(self.state["settings"].get("grpc_bind_address") or rest_bind or "127.0.0.1").strip()
+        grpc_port = int(self.state["settings"].get("grpc_port") or 9000)
+        lan_ip = self._get_lan_ip()
+        display_host = "127.0.0.1" if rest_bind in ("0.0.0.0", "::", "*") else rest_bind
+
         return {
             "running": running,
             "api_ready": api_ready,
             "pids": pids,
             "uptime_seconds": uptime_sec,
-            "rest_port": self.state["settings"]["rest_port"],
-            "grpc_port": self.state["settings"]["grpc_port"],
-            "endpoint_v1": f"http://127.0.0.1:{self.state['settings']['rest_port']}/v1",
-            "endpoint_v3": f"http://127.0.0.1:{self.state['settings']['rest_port']}/v3",
+            "rest_bind_address": rest_bind,
+            "rest_port": rest_port,
+            "grpc_bind_address": grpc_bind,
+            "grpc_port": grpc_port,
+            "lan_ip": lan_ip,
+            "endpoint_v1": f"http://{display_host}:{rest_port}/v1",
+            "endpoint_v3": f"http://{display_host}:{rest_port}/v3",
+            "lan_endpoint_v3": f"http://{lan_ip}:{rest_port}/v3",
+            "bind_endpoint_v3": f"http://{rest_bind}:{rest_port}/v3",
             "cache_dir": cache_dir,
             "cache_size_mb": cache_mb,
             "live_models": live_states,
@@ -617,9 +658,10 @@ class OvmsManager:
         }
 
     def _probe_rest_alive(self) -> bool:
+        host = self.get_probe_host()
         port = self.state["settings"]["rest_port"]
         try:
-            with urllib.request.urlopen(f"http://127.0.0.1:{port}/v1/config", timeout=0.8) as r:
+            with urllib.request.urlopen(f"http://{host}:{port}/v1/config", timeout=0.8) as r:
                 return r.status == 200
         except Exception:
             return False
@@ -641,14 +683,21 @@ class OvmsManager:
         env["PYTHONHOME"] = py_home
         env["PATH"] = f"{ovms_dir};{py_home};{py_home}\\Scripts;" + env.get("PATH", "")
 
+        rest_bind = str(settings.get("rest_bind_address") or "127.0.0.1").strip()
+        grpc_bind = str(settings.get("grpc_bind_address") or rest_bind or "127.0.0.1").strip()
+
         cmd = [
             ovms_exe,
             "--config_path",
             settings["config_json_path"],
             "--port",
             str(settings["grpc_port"]),
+            "--grpc_bind_address",
+            grpc_bind,
             "--rest_port",
             str(settings["rest_port"]),
+            "--rest_bind_address",
+            rest_bind,
             "--log_level",
             settings.get("log_level", "INFO"),
             "--file_system_poll_wait_seconds",
@@ -931,13 +980,78 @@ class OvmsManager:
 
     def update_settings(self, new_settings: Dict[str, Any]) -> Dict[str, Any]:
         rescan_needed = False
+        restart_if_running = bool(new_settings.pop("restart_if_running", False))
+        endpoint_changed = False
+
+        # Allow combined rest_api_address like "127.0.0.1:8000", "0.0.0.0:8080", or "http://192.168.1.50:8000/v3"
+        raw_api_addr = new_settings.pop("rest_api_address", None)
+        if raw_api_addr and isinstance(raw_api_addr, str) and raw_api_addr.strip():
+            s = raw_api_addr.strip()
+            if "://" not in s:
+                s = "http://" + s
+            parsed = urllib.parse.urlparse(s)
+            if parsed.hostname:
+                new_settings.setdefault("rest_bind_address", parsed.hostname)
+            if parsed.port:
+                new_settings.setdefault("rest_port", int(parsed.port))
+
         with self._lock:
+            old_rest_bind = str(self.state["settings"].get("rest_bind_address") or "127.0.0.1")
+            old_rest_port = int(self.state["settings"].get("rest_port") or 8000)
+            old_grpc_bind = str(self.state["settings"].get("grpc_bind_address") or "127.0.0.1")
+            old_grpc_port = int(self.state["settings"].get("grpc_port") or 9000)
+
             if "models_root" in new_settings and new_settings["models_root"]:
                 raw_root = str(new_settings["models_root"]).strip().strip('"')
                 abs_root = os.path.abspath(raw_root)
                 os.makedirs(abs_root, exist_ok=True)
                 new_settings["models_root"] = abs_root
                 rescan_needed = True
+
+            if "rest_bind_address" in new_settings and new_settings["rest_bind_address"] is not None:
+                rb = str(new_settings["rest_bind_address"]).strip()
+                if "://" in rb:
+                    rb = urllib.parse.urlparse(rb).hostname or "127.0.0.1"
+                elif ":" in rb and not rb.startswith("["):
+                    rb = rb.split(":")[0].strip()
+                if rb.lower() == "localhost":
+                    rb = "127.0.0.1"
+                new_settings["rest_bind_address"] = rb or "127.0.0.1"
+                if "grpc_bind_address" not in new_settings:
+                    new_settings["grpc_bind_address"] = new_settings["rest_bind_address"]
+
+            if "grpc_bind_address" in new_settings and new_settings["grpc_bind_address"] is not None:
+                gb = str(new_settings["grpc_bind_address"]).strip()
+                if gb.lower() == "localhost":
+                    gb = "127.0.0.1"
+                new_settings["grpc_bind_address"] = gb or "127.0.0.1"
+
+            if "rest_port" in new_settings and new_settings["rest_port"] is not None:
+                try:
+                    rp = int(new_settings["rest_port"])
+                except (ValueError, TypeError):
+                    return {"ok": False, "error": "REST 端口号必须为整数 (1 ~ 65535)"}
+                if rp < 1 or rp > 65535:
+                    return {"ok": False, "error": "REST 端口号超出有效范围 (1 ~ 65535)"}
+                new_settings["rest_port"] = rp
+
+            if "grpc_port" in new_settings and new_settings["grpc_port"] is not None:
+                try:
+                    gp = int(new_settings["grpc_port"])
+                except (ValueError, TypeError):
+                    return {"ok": False, "error": "gRPC 端口号必须为整数 (1 ~ 65535)"}
+                if gp < 1 or gp > 65535:
+                    return {"ok": False, "error": "gRPC 端口号超出有效范围 (1 ~ 65535)"}
+                new_settings["grpc_port"] = gp
+
+            final_rp = int(new_settings.get("rest_port", old_rest_port))
+            final_gp = int(new_settings.get("grpc_port", old_grpc_port))
+            if final_rp == final_gp:
+                if "grpc_port" not in new_settings:
+                    new_settings["grpc_port"] = final_rp + 1000 if final_rp <= 64535 else final_rp - 1
+                else:
+                    return {"ok": False, "error": "REST 端口与 gRPC 端口不能相同"}
+
             if "shared_vram_gb" in new_settings and new_settings["shared_vram_gb"] is not None:
                 try:
                     val = round(max(1.0, min(128.0, float(new_settings["shared_vram_gb"]))), 2)
@@ -954,13 +1068,33 @@ class OvmsManager:
                 new_settings["ram_budget_gb"] = rval
                 if "shared_vram_gb" not in new_settings:
                     new_settings["shared_vram_gb"] = rval
+
             self.state["settings"].update(new_settings)
             self._save_state()
+
+            endpoint_changed = (
+                self.state["settings"].get("rest_bind_address") != old_rest_bind
+                or int(self.state["settings"].get("rest_port", 8000)) != old_rest_port
+                or self.state["settings"].get("grpc_bind_address") != old_grpc_bind
+                or int(self.state["settings"].get("grpc_port", 9000)) != old_grpc_port
+            )
+
         if rescan_needed:
             self.discover_and_sync_models(write_ovms_config=True)
+
+        restarted = False
+        if restart_if_running and endpoint_changed:
+            st = self.get_server_status()
+            if st["running"]:
+                self.restart_server()
+                restarted = True
+
         return {
             "ok": True,
+            "restarted": restarted,
+            "endpoint_changed": endpoint_changed,
             "settings": self.state["settings"],
+            "server": self.get_server_status(),
             "models": self.get_models_with_live_status(),
         }
 

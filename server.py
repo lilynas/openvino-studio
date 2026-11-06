@@ -1,6 +1,7 @@
 import json
 import os
 import subprocess
+import threading
 import time
 import urllib.request
 from pathlib import Path
@@ -12,7 +13,7 @@ from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from ovms_manager import RECOMMENDED_CATALOG, OvmsManager, STUDIO_DIR
+from ovms_manager import DEFAULT_MODELS_ROOT, RECOMMENDED_CATALOG, OvmsManager, STUDIO_DIR
 from telemetry import HardwareTelemetry
 
 app = FastAPI(title="OpenVINO Studio Control Center", version="2.0.0")
@@ -79,6 +80,10 @@ class OvmsUpdateCheckReq(BaseModel):
 class OvmsUpdateApplyReq(BaseModel):
     channel: Optional[str] = None
     force_reinstall: bool = False
+
+
+class ShutdownStudioReq(BaseModel):
+    stop_ovms: bool = False
 
 
 class ChatBenchmarkReq(BaseModel):
@@ -172,9 +177,9 @@ def browse_local_folder(req: Optional[BrowseFolderReq] = None):
         import tkinter as tk
         from tkinter import filedialog
 
-        init_dir = (req.initial_dir if req and req.initial_dir else None) or ovms_mgr.state["settings"].get("models_root", r"D:\LLMs")
+        init_dir = (req.initial_dir if req and req.initial_dir else None) or ovms_mgr.state["settings"].get("models_root", DEFAULT_MODELS_ROOT)
         if not os.path.isdir(init_dir):
-            init_dir = r"D:\LLMs"
+            init_dir = DEFAULT_MODELS_ROOT
         dlg_title = (req.title if req and req.title else None) or "选择文件夹"
 
         root = tk.Tk()
@@ -261,14 +266,47 @@ def apply_ovms_update(req: OvmsUpdateApplyReq):
     return ovms_mgr.start_ovms_update(channel=req.channel, force_reinstall=req.force_reinstall)
 
 
+@app.post("/api/studio/shutdown")
+def shutdown_studio(req: ShutdownStudioReq):
+    """Shut down OpenVINO Studio backend process (optionally stopping OVMS first)."""
+    stopped_ovms = False
+    killed_pids = []
+    if req.stop_ovms:
+        stop_res = ovms_mgr.stop_server()
+        stopped_ovms = True
+        killed_pids = stop_res.get("killed_pids", [])
+
+    try:
+        telemetry_engine.stop()
+    except Exception:
+        pass
+
+    def _delayed_exit():
+        time.sleep(0.35)
+        os._exit(0)
+
+    threading.Thread(target=_delayed_exit, name="StudioShutdown", daemon=True).start()
+    return {
+        "ok": True,
+        "stopped_ovms": stopped_ovms,
+        "killed_pids": killed_pids,
+        "message": (
+            "已停止 OVMS 推理服务并关闭 OpenVINO Studio 控制台"
+            if stopped_ovms
+            else "已关闭 OpenVINO Studio 控制台（OVMS 推理服务继续在后台运行）"
+        ),
+    }
+
+
 @app.post("/api/chat/benchmark")
 def chat_benchmark(req: ChatBenchmarkReq):
     """
     Stream a test prompt to OVMS /v3/chat/completions and measure exact
     TTFT (Time-To-First-Token), total latency, token count, and tokens/sec.
     """
+    host = ovms_mgr.get_probe_host()
     port = ovms_mgr.state["settings"]["rest_port"]
-    url = f"http://127.0.0.1:{port}/v3/chat/completions"
+    url = f"http://{host}:{port}/v3/chat/completions"
     payload = {
         "model": req.model,
         "messages": [{"role": "user", "content": req.prompt}],
