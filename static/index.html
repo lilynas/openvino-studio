@@ -1,0 +1,2086 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OpenVINO Studio · 硬件加速与模型控制中心</title>
+  <style>
+    :root {
+      --bg-0: #090d16;
+      --bg-1: #0f172a;
+      --bg-2: #1e293b;
+      --bg-3: #334155;
+      --border: rgba(148, 163, 184, 0.16);
+      --border-hi: rgba(56, 189, 248, 0.45);
+      --text-0: #f8fafc;
+      --text-1: #cbd5e1;
+      --text-2: #94a3b8;
+      --accent: #0ea5e9;
+      --accent-2: #6366f1;
+      --green: #10b981;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --purple: #a855f7;
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+      background: radial-gradient(circle at 15% 0%, #0f243c 0%, var(--bg-0) 55%);
+      color: var(--text-0);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* Top Header Bar */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand-logo {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #0284c7, #6366f1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 16px;
+      letter-spacing: -0.5px;
+      box-shadow: 0 4px 14px rgba(14, 165, 233, 0.35);
+    }
+    .brand-title {
+      font-size: 17px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .brand-sub {
+      font-size: 12px;
+      color: var(--text-2);
+    }
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-size: 12.5px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      background: rgba(30, 41, 59, 0.8);
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--text-2);
+    }
+    .dot.running {
+      background: var(--green);
+      box-shadow: 0 0 10px var(--green);
+      animation: pulse 1.8s infinite;
+    }
+    .dot.stopped { background: var(--red); }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.45; }
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px 15px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      background: var(--bg-2);
+      color: var(--text-0);
+      cursor: pointer;
+      transition: all 0.16s ease;
+    }
+    .btn:hover:not(:disabled) {
+      border-color: var(--border-hi);
+      transform: translateY(-1px);
+    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary {
+      background: linear-gradient(135deg, #0284c7, #4f46e5);
+      border-color: transparent;
+    }
+    .btn-success {
+      background: linear-gradient(135deg, #059669, #10b981);
+      border-color: transparent;
+    }
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.18);
+      border-color: rgba(239, 68, 68, 0.45);
+      color: #fca5a5;
+    }
+    .btn-danger:hover:not(:disabled) {
+      background: rgba(239, 68, 68, 0.3);
+    }
+    .btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 6px; }
+
+    /* Navigation Tabs */
+    .nav-tabs {
+      display: flex;
+      gap: 6px;
+      padding: 10px 24px 0;
+      border-bottom: 1px solid var(--border);
+      background: rgba(15, 23, 42, 0.45);
+      overflow-x: auto;
+    }
+    .tab-btn {
+      padding: 10px 18px;
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--text-2);
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      white-space: nowrap;
+    }
+    .tab-btn:hover { color: var(--text-0); }
+    .tab-btn.active {
+      color: #38bdf8;
+      border-bottom-color: #38bdf8;
+      background: rgba(56, 189, 248, 0.06);
+    }
+
+    /* Main Content Container */
+    .container {
+      max-width: 1440px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 20px 24px 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* Telemetry Grid */
+    .telemetry-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(275px, 1fr));
+      gap: 16px;
+    }
+    .card {
+      background: rgba(15, 23, 42, 0.78);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      position: relative;
+      overflow: hidden;
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12.5px;
+      color: var(--text-2);
+      font-weight: 600;
+    }
+    .metric-big {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+    .metric-sub {
+      font-size: 12px;
+      color: var(--text-2);
+      line-height: 1.4;
+    }
+    .progress-bar {
+      width: 100%;
+      height: 7px;
+      background: rgba(51, 65, 85, 0.65);
+      border-radius: 999px;
+      overflow: hidden;
+      position: relative;
+    }
+    .progress-fill {
+      height: 100%;
+      border-radius: 999px;
+      transition: width 0.35s ease;
+    }
+    .engine-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 2px;
+    }
+    .chip {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 5px;
+      background: rgba(51, 65, 85, 0.55);
+      color: var(--text-1);
+      border: 1px solid rgba(148, 163, 184, 0.14);
+    }
+    .chip.hi {
+      background: rgba(14, 165, 233, 0.16);
+      color: #7dd3fc;
+      border-color: rgba(14, 165, 233, 0.35);
+    }
+    .chip.green {
+      background: rgba(16, 185, 129, 0.16);
+      color: #6ee7b7;
+      border-color: rgba(16, 185, 129, 0.35);
+    }
+    .chip.amber {
+      background: rgba(245, 158, 11, 0.16);
+      color: #fcd34d;
+      border-color: rgba(245, 158, 11, 0.35);
+    }
+
+    /* Chart Box */
+    .chart-box {
+      height: 135px;
+      width: 100%;
+      position: relative;
+    }
+    .chart-svg {
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+    }
+
+    /* Models Grid */
+    .models-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(410px, 1fr));
+      gap: 16px;
+    }
+    .model-card {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: border-color 0.18s ease;
+    }
+    .model-card.enabled {
+      border-color: rgba(14, 165, 233, 0.38);
+    }
+    .model-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .model-name {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-0);
+      word-break: break-all;
+    }
+    .model-path {
+      font-size: 11.5px;
+      color: var(--text-2);
+      font-family: Consolas, monospace;
+      margin-top: 3px;
+      word-break: break-all;
+    }
+
+    /* Switch Toggle */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 46px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background-color: #334155;
+      transition: .22s;
+      border-radius: 24px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .22s;
+      border-radius: 50%;
+    }
+    input:checked + .slider { background-color: var(--accent); }
+    input:checked + .slider:before { transform: translateX(22px); }
+
+    /* Form Controls */
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 12px;
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .field label {
+      font-size: 12px;
+      color: var(--text-1);
+      font-weight: 600;
+    }
+    .field input, .field select, .field textarea {
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 8px 11px;
+      color: var(--text-0);
+      font-size: 13px;
+      outline: none;
+    }
+    .field input:focus, .field select:focus, .field textarea:focus {
+      border-color: var(--accent);
+    }
+
+    /* Modal / Drawer */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 23, 0.76);
+      backdrop-filter: blur(5px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 20px;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: #0f172a;
+      border: 1px solid var(--border-hi);
+      border-radius: 14px;
+      max-width: 760px;
+      width: 100%;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65);
+    }
+    .modal-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-weight: 700;
+      font-size: 16px;
+    }
+    .modal-body {
+      padding: 18px 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .modal-footer {
+      padding: 14px 20px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    /* Code / Log Viewer */
+    .log-box {
+      background: #050811;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 14px;
+      font-family: Consolas, "Cascadia Mono", monospace;
+      font-size: 12px;
+      color: #a5f3fc;
+      height: 440px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      line-height: 1.5;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 22px;
+      right: 22px;
+      background: #1e293b;
+      border: 1px solid var(--border-hi);
+      color: var(--text-0);
+      padding: 11px 18px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.45);
+      z-index: 200;
+      display: none;
+    }
+    .section-view { display: none; flex-direction: column; gap: 18px; }
+    .section-view.active { display: flex; }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation & Server Master Switch -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo">OV</div>
+      <div>
+        <div class="brand-title">
+          OpenVINO Studio
+          <span class="chip hi" id="ovms-ver-badge" style="cursor:pointer" onclick="openUpdaterModal()" title="点击管理 OpenVINO 版本检测与自动/手动更新">OVMS 版本检测中...</span>
+          <span class="chip warn" id="ovms-update-pill" style="display:none;cursor:pointer" onclick="openUpdaterModal()">⬆ 发现新版本</span>
+        </div>
+        <div class="brand-sub" id="endpoint-label">REST API: http://127.0.0.1:8000/v3 · Cherry Studio 直连就绪</div>
+      </div>
+    </div>
+
+    <div class="top-actions">
+      <div class="status-pill">
+        <span class="dot stopped" id="srv-dot"></span>
+        <span id="srv-status-text">正在检测服务...</span>
+      </div>
+      <button class="btn btn-success" id="btn-start" onclick="serverAction('start')">▶ 启动 OpenVINO</button>
+      <button class="btn btn-danger" id="btn-stop" onclick="serverAction('stop')">■ 停止并释放内存</button>
+      <button class="btn" id="btn-restart" onclick="serverAction('restart')">↻ 重启服务</button>
+      <button class="btn" onclick="openUpdaterModal()">🔄 版本更新</button>
+      <button class="btn" onclick="copyEndpoint()">📋 复制 API 地址</button>
+    </div>
+  </header>
+
+  <!-- Section Tabs -->
+  <nav class="nav-tabs">
+    <button class="tab-btn active" onclick="switchTab('dashboard', this)">📊 硬件监控与模型总览</button>
+    <button class="tab-btn" onclick="switchTab('import', this)">📥 导入与在线下载模型</button>
+    <button class="tab-btn" onclick="switchTab('playground', this)">⚡ 闪电对话与吐字测速台</button>
+    <button class="tab-btn" onclick="switchTab('logs', this)">📜 实时推理日志 & 缓存管理</button>
+  </nav>
+
+  <main class="container">
+
+    <!-- TAB 1: DASHBOARD (TELEMETRY + MODELS) -->
+    <section id="tab-dashboard" class="section-view active">
+
+      <!-- 4 Universal Hardware Cards: CPU, GPU, NPU, RAM + 16GB Budget -->
+      <div class="telemetry-grid">
+        <!-- CPU Card -->
+        <div class="card">
+          <div class="card-header">
+            <span>CPU 处理器负载 (AVX-VNNI)</span>
+            <span class="chip" id="cpu-freq">-- MHz</span>
+          </div>
+          <div class="metric-big">
+            <span id="cpu-pct">0.0%</span>
+            <span style="font-size:12px;color:var(--text-2);font-weight:500" id="cpu-cores">12核 16线程</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="cpu-bar" style="width:0%;background:linear-gradient(90deg,#38bdf8,#6366f1)"></div>
+          </div>
+          <div class="metric-sub" id="cpu-name">13th Gen Intel Core i5-13500H</div>
+        </div>
+
+        <!-- GPU Card -->
+        <div class="card">
+          <div class="card-header">
+            <span>GPU 显卡加速 (iGPU / dGPU)</span>
+            <span class="chip hi" id="gpu-ovms-chip">OVMS 占用: 0%</span>
+          </div>
+          <div class="metric-big">
+            <span id="gpu-pct" style="color:#38bdf8">0.0%</span>
+            <span style="font-size:12px;color:var(--text-2);font-weight:500;display:inline-flex;align-items:center;gap:5px">
+              <span id="gpu-vram-text">共享显存: 0.00 / 16.0 GB</span>
+              <button class="btn btn-sm" style="padding:1px 6px;font-size:11px;line-height:1.2" onclick="openVramModal()" title="自定义共享显存大小 / 显存预算上限 (默认 16GB)">✎</button>
+            </span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="gpu-bar" style="width:0%;background:linear-gradient(90deg,#0ea5e9,#10b981)"></div>
+          </div>
+          <div class="metric-sub" id="gpu-name">Intel(R) Iris(R) Xe Graphics</div>
+          <div class="engine-chips" id="gpu-engines"></div>
+        </div>
+
+        <!-- Universal NPU Card -->
+        <div class="card">
+          <div class="card-header">
+            <span>NPU 神经网络处理器 (MCDM/DXCore)</span>
+            <span class="chip" id="npu-badge">自动探测</span>
+          </div>
+          <div class="metric-big">
+            <span id="npu-pct" style="color:#a855f7">--</span>
+            <span style="font-size:12px;color:var(--text-2);font-weight:500" id="npu-sub-status">未安装硬件</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="npu-bar" style="width:0%;background:linear-gradient(90deg,#a855f7,#ec4899)"></div>
+          </div>
+          <div class="metric-sub" id="npu-desc">支持 Intel AI Boost / AMD Ryzen AI / 骁龙 Hexagon NPU 实时利用率监测</div>
+        </div>
+
+        <!-- RAM & Shared VRAM Budget Card -->
+        <div class="card">
+          <div class="card-header">
+            <span id="ram-card-title">系统内存 & OVMS 16GB 共享显存预算</span>
+            <div style="display:flex;align-items:center;gap:5px">
+              <span class="chip green" id="ovms-ram-chip">OVMS 独占: 0.00 GB</span>
+              <button class="btn btn-sm" style="padding:1px 6px;font-size:11px;line-height:1.2" onclick="openVramModal()" title="自定义共享显存与模型内存预算上限 (默认 16GB)">✎ 自定义</button>
+            </div>
+          </div>
+          <div class="metric-big">
+            <span id="ram-used">0.0 GB</span>
+            <span style="font-size:13px;color:var(--text-2);font-weight:500" id="ram-total">/ 31.7 GB</span>
+          </div>
+          <div class="progress-bar" title="蓝色为系统总占用，绿色刻度为 OVMS 模型占用占共享显存预算比例">
+            <div class="progress-fill" id="ram-bar" style="width:0%;background:linear-gradient(90deg,#10b981,#f59e0b)"></div>
+          </div>
+          <div class="metric-sub" id="ram-budget-text">16.0GB 共享显存预算剩余: 16.00 GB (100%)</div>
+        </div>
+      </div>
+
+      <!-- 60-Second Real-Time Telemetry Area Chart -->
+      <div class="card">
+        <div class="card-header">
+          <span>📈 60 秒实时硬件算力曲线 (CPU / GPU / NPU / 内存)</span>
+          <div style="display:flex;gap:14px;font-size:12px">
+            <span style="color:#38bdf8">● GPU 核显/独显 (%)</span>
+            <span style="color:#6366f1">● CPU 处理器 (%)</span>
+            <span style="color:#a855f7">● NPU 加速器 (%)</span>
+            <span style="color:#10b981">● OVMS 模型内存 (GB)</span>
+          </div>
+        </div>
+        <div class="chart-box">
+          <svg class="chart-svg" id="telemetry-svg" viewBox="0 0 900 125" preserveAspectRatio="none"></svg>
+        </div>
+      </div>
+
+      <!-- Models Management Header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:4px">
+        <div>
+          <h2 style="font-size:18px;font-weight:700">📦 本地模型仓库与启停开关</h2>
+          <p style="font-size:12.5px;color:var(--text-2);margin-top:2px">
+            勾选开关即可实时将模型加入或移出 OpenVINO 服务（支持热重载，停用模型立即释放内存，与 Cherry Studio 100% 同步）
+          </p>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <div style="display:flex;align-items:center;gap:6px;background:rgba(15,23,42,0.85);border:1px solid var(--border);padding:4px 10px;border-radius:8px;font-size:12px">
+            <span style="color:var(--text-2)">默认模型库根目录:</span>
+            <code id="current-models-root-label" style="color:#38bdf8;font-family:Consolas,monospace">./models</code>
+            <button class="btn btn-sm" style="padding:2px 8px" onclick="openRootDirModal()" title="修改默认模型存储与扫描根目录">✎ 更改位置</button>
+            <button class="btn btn-sm" style="padding:2px 8px" onclick="openRootExplorer()" title="在资源管理器中打开默认模型根目录">📂 打开根目录</button>
+          </div>
+          <button class="btn btn-sm" onclick="scanModels(true)">🔄 重新扫描模型目录</button>
+          <button class="btn btn-sm btn-primary" onclick="switchTab('import', document.querySelectorAll('.tab-btn')[1])">＋ 导入 / 下载新模型</button>
+        </div>
+      </div>
+
+      <!-- Models Card Grid -->
+      <div class="models-grid" id="models-container"></div>
+
+    </section>
+
+    <!-- TAB 2: IMPORT & ONLINE DOWNLOAD -->
+    <section id="tab-import" class="section-view">
+      <div class="card">
+        <div class="card-header">
+          <span style="font-size:15px;color:var(--text-0)">📁 导入本地已有模型文件夹 (OpenVINO IR 或 GGUF)</span>
+        </div>
+        <p class="metric-sub">
+          选择任意包含 <code>openvino_model.xml</code> / <code>openvino_language_model.xml</code> 或 <code>.gguf</code> 的文件夹。若缺少 <code>graph.pbtxt</code>，系统将自动为您生成针对 Iris Xe 核显优化的配置文件。
+        </p>
+        <div class="form-grid" style="margin-top:8px">
+          <div class="field" style="grid-column: span 2;">
+            <label>本地模型文件夹路径</label>
+            <div style="display:flex;gap:8px">
+              <input type="text" id="import-folder-path" placeholder="例如 D:\LLMs\Qwen3-8B-int4-ov" style="flex:1" />
+              <button class="btn" onclick="browseLocalFolder()">📂 浏览选择文件夹...</button>
+            </div>
+          </div>
+          <div class="field">
+            <label>自定义模型名称 (选填，留空默认文件夹名)</label>
+            <input type="text" id="import-custom-name" placeholder="自动识别" />
+          </div>
+          <div class="field">
+            <label>默认推理计算设备</label>
+            <select id="import-device">
+              <option value="GPU">GPU (Intel Iris Xe / Arc 核显加速)</option>
+              <option value="CPU">CPU (13代酷睿 AVX-VNNI 纯算)</option>
+              <option value="NPU">NPU (专用神经网络核心)</option>
+              <option value="AUTO">AUTO (OpenVINO 自动负载均衡)</option>
+              <option value="HETERO:GPU,CPU">HETERO:GPU,CPU (核显+CPU异构并发)</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:8px">
+          <button class="btn btn-primary" onclick="submitImportModel()">✔ 立即导入并注册到 OpenVINO</button>
+        </div>
+      </div>
+
+      <!-- Active Downloads Progress -->
+      <div class="card" id="downloads-card" style="display:none">
+        <div class="card-header">
+          <span style="font-size:15px;color:#38bdf8">🚀 正在进行的下载任务</span>
+        </div>
+        <div id="downloads-list" style="display:flex;flex-direction:column;gap:10px"></div>
+      </div>
+
+      <!-- Online Model Hub Download -->
+      <div class="card">
+        <div class="card-header">
+          <span style="font-size:15px;color:var(--text-0)">🌐 在线高速拉取 OpenVINO 官方预量化模型 (支持阿里魔搭满速直连)</span>
+        </div>
+        <div class="form-grid" style="margin-top:6px">
+          <div class="field" style="grid-column: span 2;">
+            <label>模型仓库 ID (ModelScope / HuggingFace)</label>
+            <input type="text" id="dl-repo-id" placeholder="例如 OpenVINO/Qwen3-4B-int4-ov 或 OpenVINO/gemma-4-12B-it-int4-ov" />
+          </div>
+          <div class="field" style="grid-column: span 2;">
+            <label>模型保存根目录 (可自定义下载到任意磁盘目录，留空则使用默认模型库根目录)</label>
+            <div style="display:flex;gap:8px">
+              <input type="text" id="dl-dest-root" placeholder="默认跟随全局模型根目录 (例如 D:\LLMs)" style="flex:1" />
+              <button class="btn" onclick="browseDownloadDestRoot()">📂 选择保存目录...</button>
+            </div>
+          </div>
+          <div class="field">
+            <label>高速下载源</label>
+            <select id="dl-source">
+              <option value="modelscope">ModelScope 阿里魔搭社区 (国内千兆免代理首选)</option>
+              <option value="hf-mirror">HF-Mirror 国内镜像站 (hf-mirror.com)</option>
+              <option value="huggingface">HuggingFace 官方源</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>下载后默认计算设备</label>
+            <select id="dl-device">
+              <option value="GPU">GPU (核显加速)</option>
+              <option value="CPU">CPU</option>
+              <option value="AUTO">AUTO</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:8px">
+          <button class="btn btn-primary" onclick="startCustomDownload()">⬇ 开始高速下载</button>
+        </div>
+      </div>
+
+      <!-- Curated 16GB RAM Budget Model Catalog -->
+      <div>
+        <h3 style="font-size:16px;margin-bottom:10px">✨ 适合你设备 (16GB RAM 预算内) 的官方 INT4 精选模型库</h3>
+        <div class="models-grid" id="catalog-container"></div>
+      </div>
+    </section>
+
+    <!-- TAB 3: PLAYGROUND & SPEED BENCHMARK -->
+    <section id="tab-playground" class="section-view">
+      <div class="card">
+        <div class="card-header">
+          <span style="font-size:15px;color:var(--text-0)">⚡ 闪电对话与硬件性能测速台 (直连 /v3/chat/completions)</span>
+          <span class="chip hi" id="bench-status">准备就绪</span>
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label>选择已启用的测试模型</label>
+            <select id="bench-model"></select>
+          </div>
+          <div class="field">
+            <label>最大生成长度 (Max Tokens)</label>
+            <input type="number" id="bench-max-tokens" value="256" min="16" max="4096" />
+          </div>
+          <div class="field">
+            <label>采样温度 (Temperature)</label>
+            <input type="number" id="bench-temp" value="0.7" step="0.1" min="0" max="2" />
+          </div>
+        </div>
+        <div class="field" style="margin-top:6px">
+          <label>测试提示词 (Prompt)</label>
+          <textarea id="bench-prompt" rows="3">请用简明清晰的中文介绍 Intel Iris Xe 核显配合 OpenVINO 跑 INT4 大语言模型时的工作原理，并给出一段 Python 二分查找示例代码。</textarea>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-top:8px">
+          <div style="display:flex;gap:12px;flex-wrap:wrap">
+            <span class="chip hi" id="metric-ttft">首字延迟 (TTFT): -- ms</span>
+            <span class="chip green" id="metric-tps">吐字速度: -- tokens/s</span>
+            <span class="chip" id="metric-tokens">生成词元: -- tokens</span>
+            <span class="chip" id="metric-total">总耗时: -- s</span>
+          </div>
+          <button class="btn btn-primary" id="btn-run-bench" onclick="runBenchmark()">🚀 发送并实测速度</button>
+        </div>
+        <div class="log-box" id="bench-output" style="height:310px;color:#f8fafc;font-size:13.5px">点击上方「发送并实测速度」即可直接测试当前模型并实时计算 TTFT 首字延迟与每秒 Token 速率...</div>
+      </div>
+    </section>
+
+    <!-- TAB 4: LOGS & GLOBAL SETTINGS -->
+    <section id="tab-logs" class="section-view">
+      <div class="telemetry-grid">
+        <div class="card">
+          <div class="card-header">
+            <span>⚡ GPU/NPU 着色器编译缓存 (CACHE_DIR)</span>
+            <span class="chip green" id="cache-size-badge">0.0 MB</span>
+          </div>
+          <div class="metric-sub">
+            已开启持久化缓存目录 <code id="cache-dir-label">ovms_cache</code>。首次加载模型编译 OpenCL 内核后自动落盘，后续二次启动速度提升 5~10 倍！
+          </div>
+          <div style="margin-top:auto;padding-top:8px">
+            <button class="btn btn-sm btn-danger" onclick="clearShaderCache()">🗑 清理编译缓存</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span>🌙 空闲自动停止服务省电保护 & 共享显存上限</span>
+          </div>
+          <div class="field">
+            <label>无对话自动停止时间 (分钟，0 表示永不自动关闭)</label>
+            <select id="setting-idle-min">
+              <option value="0">0 分钟 (常驻后台，手动启停)</option>
+              <option value="15">15 分钟无请求自动休眠释放内存</option>
+              <option value="30">30 分钟无请求自动休眠释放内存</option>
+              <option value="60">60 分钟无请求自动休眠释放内存</option>
+            </select>
+          </div>
+          <div class="field" style="margin-top:6px">
+            <label>自定义共享显存大小 / 模型显存预算上限 (GB，默认 16 GB)</label>
+            <div style="display:flex;gap:8px;align-items:center">
+              <input type="number" id="setting-shared-vram-gb" value="16" min="2" max="128" step="0.5" style="width:110px" />
+              <button class="btn btn-sm" onclick="document.getElementById('setting-shared-vram-gb').value=16">重置 16GB</button>
+              <button class="btn btn-sm btn-primary" style="margin-left:auto" onclick="saveGlobalSettings()">💾 保存设置</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span>🧠 实时 KV Cache 显存块状态</span>
+          </div>
+          <div class="metric-big" id="kv-cache-pct" style="font-size:22px;color:#38bdf8">动态分配 (Dynamic)</div>
+          <div class="metric-sub" id="kv-cache-detail">根据 OVMS 日志自动提取当前连续批处理 KV Cache 占用率</div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span>🔄 OpenVINO 引擎版本与更新管理</span>
+            <span class="chip hi" id="card-ovms-channel">Weekly 通道</span>
+          </div>
+          <div class="metric-sub" id="card-ovms-ver-summary">本地版本: 读取中...</div>
+          <div style="margin-top:auto;padding-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-sm btn-primary" onclick="openUpdaterModal()">⚙ 打开版本更新与自动升级设置</button>
+            <button class="btn btn-sm" onclick="triggerManualUpdateCheck()">🔍 立即检测</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span>📜 OpenVINO Model Server 实时控制台日志</span>
+          <button class="btn btn-sm" onclick="refreshLogs()">🔄 刷新日志</button>
+        </div>
+        <div class="log-box" id="ovms-log-box">正在加载日志...</div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Modal for Tuning Model Parameters & graph.pbtxt -->
+  <div class="modal-backdrop" id="param-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <span id="modal-title">⚙ 调整模型推理参数</span>
+        <button class="btn btn-sm" onclick="closeParamModal()">✕ 关闭</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="modal-model-name" />
+        <div class="form-grid">
+          <div class="field">
+            <label>目标推理硬件 (device)</label>
+            <select id="p-device" onchange="previewGeneratedPbtxt()">
+              <option value="GPU">GPU (Intel Iris Xe / Arc 核显)</option>
+              <option value="CPU">CPU (酷睿 AVX-VNNI 纯算)</option>
+              <option value="NPU">NPU (神经网络处理器)</option>
+              <option value="AUTO">AUTO (自动调度)</option>
+              <option value="HETERO:GPU,CPU">HETERO:GPU,CPU (异构混合)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>KV Cache 缓存精度 (KV_CACHE_PRECISION)</label>
+            <select id="p-kv-prec" onchange="previewGeneratedPbtxt()">
+              <option value="f16">f16 (FP16 高精度防乱码 - 推荐 Gemma4/Qwen)</option>
+              <option value="u8">u8 (INT8 压缩显存 - 省一半长文本内存)</option>
+              <option value="default">default (跟随模型默认)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>最大并发序列数 (max_num_seqs)</label>
+            <input type="number" id="p-max-seqs" value="256" min="1" max="1024" oninput="previewGeneratedPbtxt()" />
+          </div>
+          <div class="field">
+            <label>KV Cache 显存上限 GB (0 = 动态按需分配)</label>
+            <input type="number" id="p-cache-size" value="0" min="0" max="32" oninput="previewGeneratedPbtxt()" />
+          </div>
+          <div class="field">
+            <label>性能调度策略 (PERFORMANCE_HINT)</label>
+            <select id="p-perf-hint" onchange="previewGeneratedPbtxt()">
+              <option value="">默认 (单人对话低延迟最优)</option>
+              <option value="LATENCY">LATENCY (极致首字低延迟)</option>
+              <option value="THROUGHPUT">THROUGHPUT (高并发吞吐优先)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>流水线类型 (pipeline_type)</label>
+            <select id="p-pipe-type" onchange="previewGeneratedPbtxt()">
+              <option value="AUTO">AUTO (自动识别 LLM / VLM 多模态)</option>
+              <option value="LM_CB">LM_CB (纯文本连续批处理)</option>
+              <option value="VLM_CB">VLM_CB (视觉多模态连续批处理)</option>
+              <option value="LM">LM (标准单流语言模型)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>启用前缀提示词缓存 (enable_prefix_caching)</label>
+            <select id="p-prefix-cache" onchange="previewGeneratedPbtxt()">
+              <option value="true">true (开启 - 多轮对话首字极快)</option>
+              <option value="false">false (关闭)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>动态分块融合 (dynamic_split_fuse)</label>
+            <select id="p-split-fuse" onchange="previewGeneratedPbtxt()">
+              <option value="true">true (开启 - 推荐)</option>
+              <option value="false">false (关闭)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field" style="margin-top:6px">
+          <label style="display:flex;justify-content:space-between">
+            <span>底层 MediaPipe 配置文件预览与高级编辑 (<code>graph.pbtxt</code>)</span>
+            <label style="font-weight:400;font-size:11.5px;cursor:pointer">
+              <input type="checkbox" id="p-use-raw" /> 使用下方手动编辑的原始 pbtxt 保存
+            </label>
+          </label>
+          <textarea id="p-raw-pbtxt" rows="10" style="font-family:Consolas,monospace;font-size:12px;color:#7dd3fc"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeParamModal()">取消</button>
+        <button class="btn btn-primary" onclick="saveModelParams()">💾 保存参数并立即热重载生效</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2: Delete Model (Unregister vs Delete Disk Files) -->
+  <div class="modal-backdrop" id="delete-modal">
+    <div class="modal" style="max-width:520px">
+      <div class="modal-header">
+        <span id="delete-modal-title">🗑 删除或移除模型</span>
+        <button class="btn btn-sm" onclick="closeDeleteModal()">✕ 关闭</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="delete-model-name" />
+        <p style="font-size:13.5px;color:var(--text-1);line-height:1.5">
+          请选择对模型 <strong id="delete-model-label" style="color:#38bdf8"></strong> 的处理方式：
+        </p>
+        <div style="background:rgba(30,41,59,0.75);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:12px;font-family:Consolas,monospace;color:var(--text-2);word-break:break-all" id="delete-model-path"></div>
+        <div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:10px 12px;font-size:12.5px;color:#fca5a5;line-height:1.45">
+          • <strong>仅从列表移除</strong>：从 OpenVINO 服务与前端列表中卸载，<strong>保留硬盘上的模型文件</strong>（且不会在下次自动扫描时被重复加回，可随时重新导入）。<br/>
+          • <strong>彻底删除本地文件</strong>：从列表中卸载并<strong>永久删除硬盘上的模型文件夹</strong>，立即释放磁盘空间（约 <span id="delete-model-size">0</span> GB）。
+        </div>
+      </div>
+      <div class="modal-footer" style="justify-content:space-between">
+        <button class="btn" onclick="closeDeleteModal()">取消</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn" onclick="confirmDeleteModel(false)">仅从列表移除 (保留文件)</button>
+          <button class="btn btn-danger" onclick="confirmDeleteModel(true)">🗑 彻底删除本地模型文件</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 3: Customize Model Location / Relocate Model -->
+  <div class="modal-backdrop" id="relocate-modal">
+    <div class="modal" style="max-width:580px">
+      <div class="modal-header">
+        <span id="relocate-modal-title">📍 自定义模型所在位置</span>
+        <button class="btn btn-sm" onclick="closeRelocateModal()">✕ 关闭</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="relocate-model-name" />
+        <div class="field">
+          <label>当前模型路径</label>
+          <input type="text" id="relocate-old-path" disabled style="opacity:0.7;font-family:Consolas,monospace" />
+        </div>
+        <div class="field">
+          <label>新的模型所在文件夹路径</label>
+          <div style="display:flex;gap:8px">
+            <input type="text" id="relocate-new-path" placeholder="例如 E:\Models\Qwen2.5-7B-Instruct-int4-ov" style="flex:1;font-family:Consolas,monospace" />
+            <button class="btn" onclick="browseRelocateFolder()">📂 浏览选择...</button>
+          </div>
+        </div>
+        <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:var(--text-1);cursor:pointer;background:rgba(30,41,59,0.6);padding:10px 12px;border-radius:8px;border:1px solid var(--border)">
+          <input type="checkbox" id="relocate-move-files" style="margin-top:3px" />
+          <span>
+            <strong>自动将原目录下的模型文件迁移（剪切移动）到新路径</strong><br/>
+            <span style="font-size:12px;color:var(--text-2)">若不勾选，则仅修改指向路径（适用于您已经手动将模型文件夹移动到新位置的情况）。</span>
+          </span>
+        </label>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeRelocateModal()">取消</button>
+        <button class="btn btn-primary" id="btn-confirm-relocate" onclick="confirmRelocateModel()">✔ 应用新路径并同步 OVMS</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 4: Customize Global Default Models Root Directory -->
+  <div class="modal-backdrop" id="rootdir-modal">
+    <div class="modal" style="max-width:540px">
+      <div class="modal-header">
+        <span>📁 自定义默认模型库根目录</span>
+        <button class="btn btn-sm" onclick="closeRootDirModal()">✕ 关闭</button>
+      </div>
+      <div class="modal-body">
+        <p class="metric-sub">
+          设置全局默认的模型存储与自动扫描根目录。修改后，在线下载新模型默认保存在此目录，且系统会自动扫描该目录下的所有 OpenVINO / GGUF 模型（其他自定义路径下已导入的模型也会保留）。
+        </p>
+        <div class="field">
+          <label>默认模型库根目录路径</label>
+          <div style="display:flex;gap:8px">
+            <input type="text" id="rootdir-input" placeholder="例如 D:\LLMs 或 E:\AI_Models" style="flex:1;font-family:Consolas,monospace" />
+            <button class="btn" onclick="browseGlobalRootFolder()">📂 浏览选择...</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeRootDirModal()">取消</button>
+        <button class="btn btn-primary" onclick="saveRootDirModal()">💾 保存并扫描新目录</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 5: OpenVINO Version Check & Auto / Manual Update Center -->
+  <div class="modal-backdrop" id="updater-modal">
+    <div class="modal" style="max-width:650px">
+      <div class="modal-header">
+        <span>🔄 OpenVINO Model Server 版本检测与更新中心</span>
+        <button class="btn btn-sm" onclick="closeUpdaterModal()">✕ 关闭</button>
+      </div>
+      <div class="modal-body">
+        <!-- Installed vs Remote comparison -->
+        <div class="form-grid">
+          <div class="card" style="padding:12px 14px;background:rgba(15,23,42,0.75)">
+            <div class="card-header" style="margin-bottom:4px">
+              <span>💻 本地已安装版本</span>
+              <span class="chip green">当前运行环境</span>
+            </div>
+            <div style="font-size:16px;font-weight:700;color:var(--text-0)" id="upd-local-ver">--</div>
+            <div class="metric-sub" id="upd-local-backend" style="font-size:11.5px">OpenVINO Backend: --</div>
+            <div class="metric-sub" id="upd-local-genai" style="font-size:11.5px">GenAI Backend: --</div>
+          </div>
+
+          <div class="card" style="padding:12px 14px;background:rgba(15,23,42,0.75)">
+            <div class="card-header" style="margin-bottom:4px">
+              <span>☁ 官方远端最新版本</span>
+              <span class="chip hi" id="upd-remote-badge">待检测</span>
+            </div>
+            <div style="font-size:16px;font-weight:700;color:#38bdf8" id="upd-remote-ver">--</div>
+            <div class="metric-sub" id="upd-remote-meta" style="font-size:11.5px">点击「立即检测更新」获取官方最新构建信息</div>
+            <div class="metric-sub" id="upd-last-checked" style="font-size:11px;color:var(--text-2)">上次检测: --</div>
+          </div>
+        </div>
+
+        <!-- Live Update Progress Box -->
+        <div id="upd-progress-panel" style="display:none;background:rgba(2,132,199,0.12);border:1px solid rgba(56,189,248,0.35);border-radius:10px;padding:12px 14px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:13px;font-weight:600;color:#7dd3fc" id="upd-progress-msg">正在准备更新...</span>
+            <span class="chip hi" id="upd-progress-pct">0%</span>
+          </div>
+          <div class="bar-track" style="height:8px">
+            <div class="bar-fill gpu" id="upd-progress-bar" style="width:0%"></div>
+          </div>
+        </div>
+
+        <div id="upd-error-box" style="display:none;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.35);border-radius:10px;padding:10px 12px;color:#fca5a5;font-size:12.5px"></div>
+
+        <!-- Update Channel & Auto/Manual Strategy Settings -->
+        <div style="border-top:1px solid var(--border);padding-top:12px;display:flex;flex-direction:column;gap:12px">
+          <div class="form-grid">
+            <div class="field">
+              <label>官方更新通道 (Update Channel)</label>
+              <select id="upd-channel-select" onchange="saveUpdaterSettings(true)">
+                <option value="weekly">🚀 Weekly 前沿构建版 (推荐 · 第一时间支持 Gemma 4 / Qwen3.5 等新架构)</option>
+                <option value="stable">🛡 GitHub Stable 正式稳定版 (季度发版 · 保守稳定)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>后台自动检测频率</label>
+              <select id="upd-interval-select" onchange="saveUpdaterSettings(false)">
+                <option value="1">每 1 小时检测一次</option>
+                <option value="6">每 6 小时检测一次 (推荐)</option>
+                <option value="12">每 12 小时检测一次</option>
+                <option value="24">每天检测一次 (24h)</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:8px;background:rgba(15,23,42,0.55);padding:11px 14px;border-radius:9px;border:1px solid var(--border)">
+            <label style="display:flex;align-items:center;gap:9px;cursor:pointer;font-size:13px;color:var(--text-0)">
+              <input type="checkbox" id="upd-auto-check" onchange="saveUpdaterSettings(false)" style="width:16px;height:16px" />
+              <span><strong>开启自动检测版本更新</strong>（启动控制台时及后台定时静默检查官方新版本，发现更新时顶部高亮提醒）</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:9px;cursor:pointer;font-size:13px;color:var(--text-0)">
+              <input type="checkbox" id="upd-auto-apply" onchange="saveUpdaterSettings(false)" style="width:16px;height:16px" />
+              <span><strong>开启全自动无感更新</strong>（检测到新版本后自动下载、校验 SHA256、平滑重启替换，保留全部模型与参数配置；不勾选则为<strong>手动确认更新</strong>）</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="justify-content:space-between">
+        <button class="btn btn-sm" id="btn-force-reinstall" onclick="triggerManualUpdateApply(true)" title="即使版本号相同也强制重新下载覆盖修复组件">🔧 强制重装/修复当前版本</button>
+        <div style="display:flex;gap:10px">
+          <button class="btn" id="btn-check-upd" onclick="triggerManualUpdateCheck()">🔍 立即检测更新</button>
+          <button class="btn btn-success" id="btn-apply-upd" onclick="triggerManualUpdateApply(false)">⬆ 手动一键升级到最新版</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 6: Customize Shared VRAM Size & Model Memory Budget -->
+  <div class="modal-backdrop" id="vram-modal">
+    <div class="modal" style="max-width:520px">
+      <div class="modal-header">
+        <span>🎛 自定义共享显存大小 & 模型内存预算上限</span>
+        <button class="btn btn-sm" onclick="closeVramModal()">✕ 关闭</button>
+      </div>
+      <div class="modal-body">
+        <p class="metric-sub">
+          设置核显共享显存大小与 OpenVINO 模型安全内存预算上限（<strong>默认 16 GB</strong>）。修改后将实时应用于顶部 GPU 共享显存显示、内存预算剩余裕量计算以及 60 秒实时算力曲线刻度。
+        </p>
+        <div class="field">
+          <label>共享显存大小 / 模型显存预算上限 (GB，默认 16 GB)</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="number" id="vram-modal-input" value="16" min="2" max="128" step="0.5" style="flex:1;font-size:14px;font-weight:600" />
+            <button class="btn" onclick="setVramPreset(16)">恢复默认 (16 GB)</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>常用容量快捷预设</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-sm" onclick="setVramPreset(8)">8 GB (轻量省内存)</button>
+            <button class="btn btn-sm" onclick="setVramPreset(12)">12 GB (均衡配置)</button>
+            <button class="btn btn-sm btn-primary" onclick="setVramPreset(16)">16 GB (默认推荐)</button>
+            <button class="btn btn-sm" onclick="setVramPreset(20)">20 GB (中大模型)</button>
+            <button class="btn btn-sm" onclick="setVramPreset(24)">24 GB (极限大模型)</button>
+          </div>
+        </div>
+        <div class="metric-sub" id="vram-hw-hint" style="background:rgba(15,23,42,0.65);padding:9px 12px;border-radius:8px;border:1px solid var(--border)">
+          Windows 硬件探测到的最大共享显存上限: 15.9 GB (系统总物理内存: 31.7 GB)
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeVramModal()">取消</button>
+        <button class="btn btn-primary" onclick="saveVramModal()">💾 保存并立即生效</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let latestState = null;
+
+    function showToast(msg, duration = 3000) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.style.display = 'block';
+      clearTimeout(window._toastTimer);
+      window._toastTimer = setTimeout(() => { t.style.display = 'none'; }, duration);
+    }
+
+    function switchTab(tabId, btnEl) {
+      document.querySelectorAll('.section-view').forEach(s => s.classList.remove('active'));
+      document.getElementById('tab-' + tabId).classList.add('active');
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      if (btnEl) btnEl.classList.add('active');
+      if (tabId === 'logs') refreshLogs();
+    }
+
+    async function apiCall(path, method = 'GET', body = null) {
+      const opts = { method, headers: {} };
+      if (body !== null) {
+        opts.headers['Content-Type'] = 'application/json';
+        opts.body = JSON.stringify(body);
+      }
+      const res = await fetch(path, opts);
+      return await res.json();
+    }
+
+    async function serverAction(action) {
+      const labels = { start: '正在启动 OpenVINO 服务...', stop: '正在停止服务并释放内存...', restart: '正在重启服务...' };
+      showToast(labels[action] || '正在执行...');
+      const res = await apiCall(`/api/server/${action}`, 'POST');
+      showToast(res.message || res.error || '操作完成');
+      await fetchOverview();
+    }
+
+    function copyEndpoint() {
+      const url = latestState?.server?.endpoint_v3 || 'http://127.0.0.1:8000/v3';
+      navigator.clipboard.writeText(url);
+      showToast(`已复制 OpenAI 兼容地址: ${url}`);
+    }
+
+    function renderTelemetryChart(history) {
+      const svg = document.getElementById('telemetry-svg');
+      if (!history || history.length < 2) {
+        svg.innerHTML = '';
+        return;
+      }
+      const W = 900, H = 120;
+      const maxPts = 60;
+      const pts = history.slice(-maxPts);
+
+      function makePath(key, scaleMax = 100) {
+        return pts.map((p, idx) => {
+          const x = (idx / Math.max(1, pts.length - 1)) * W;
+          const val = Math.min(scaleMax, Math.max(0, Number(p[key] || 0)));
+          const y = H - (val / scaleMax) * (H - 12) - 4;
+          return `${idx === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+        }).join(' ');
+      }
+
+      const customVramScale = Number(latestState?.server?.settings?.shared_vram_gb ?? latestState?.server?.settings?.ram_budget_gb ?? 16.0) || 16.0;
+      const gpuPath = makePath('gpu', 100);
+      const cpuPath = makePath('cpu', 100);
+      const npuPath = makePath('npu', 100);
+      const ramPath = makePath('ovms_ram_gb', customVramScale);
+
+      svg.innerHTML = `
+        <line x1="0" y1="30" x2="${W}" y2="30" stroke="rgba(148,163,184,0.1)" stroke-dasharray="4" />
+        <line x1="0" y1="60" x2="${W}" y2="60" stroke="rgba(148,163,184,0.1)" stroke-dasharray="4" />
+        <line x1="0" y1="90" x2="${W}" y2="90" stroke="rgba(148,163,184,0.1)" stroke-dasharray="4" />
+        <path d="${gpuPath} L${W},${H} L0,${H} Z" fill="rgba(56,189,248,0.12)" />
+        <path d="${gpuPath}" fill="none" stroke="#38bdf8" stroke-width="2.4" />
+        <path d="${cpuPath}" fill="none" stroke="#6366f1" stroke-width="2" />
+        <path d="${npuPath}" fill="none" stroke="#a855f7" stroke-width="2" stroke-dasharray="3,3" />
+        <path d="${ramPath}" fill="none" stroke="#10b981" stroke-width="2" />
+      `;
+    }
+
+    function renderModels(models) {
+      const container = document.getElementById('models-container');
+      const benchSelect = document.getElementById('bench-model');
+      const prevBench = benchSelect.value;
+
+      const stateBadgeMap = {
+        AVAILABLE: { text: '● 运行就绪 (AVAILABLE)', cls: 'green' },
+        LOADING:   { text: '◐ 正在编译加载...', cls: 'amber' },
+        DISABLED:  { text: '○ 已停用 (不占内存)', cls: '' },
+        STOPPED:   { text: '■ 服务未启动', cls: '' },
+      };
+
+      container.innerHTML = models.map((m, idx) => {
+        const st = stateBadgeMap[m.runtime_state] || { text: m.runtime_state, cls: 'amber' };
+        const p = m.params || {};
+        return `
+          <div class="model-card ${m.enabled ? 'enabled' : ''}">
+            <div class="model-top">
+              <div>
+                <div class="model-name">${m.name}</div>
+                <div class="model-path">${m.base_path}</div>
+              </div>
+              <label class="switch" title="勾选启用或停用该模型">
+                <input type="checkbox" ${m.enabled ? 'checked' : ''} onchange="toggleModelByIdx(${idx}, this.checked)" />
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="engine-chips">
+              <span class="chip ${st.cls}">${st.text}</span>
+              <span class="chip hi">设备: ${p.device || 'GPU'}</span>
+              <span class="chip">KV精度: ${p.kv_cache_precision || 'f16'}</span>
+              <span class="chip">体积: ${m.size_gb} GB</span>
+              <span class="chip">${m.task_type}</span>
+            </div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-top:auto;padding-top:6px;border-top:1px solid var(--border)">
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <button class="btn btn-sm" onclick="openParamModalByIdx(${idx})">⚙ 参数调优</button>
+                <button class="btn btn-sm" onclick="openExplorerByIdx(${idx})">📂 打开目录</button>
+                <button class="btn btn-sm" onclick="openRelocateModalByIdx(${idx})" title="自定义或迁移该模型所在文件夹位置">📍 更改位置</button>
+              </div>
+              <div style="display:flex;gap:6px">
+                <button class="btn btn-sm" onclick="quickTestModelByIdx(${idx})">⚡ 测速</button>
+                <button class="btn btn-sm btn-danger" onclick="openDeleteModalByIdx(${idx})">🗑 删除</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      const enabledModels = models.filter(m => m.enabled);
+      benchSelect.innerHTML = enabledModels.map(m => `<option value="${m.name}">${m.name} (${m.params?.device || 'GPU'})</option>`).join('');
+      if (prevBench && enabledModels.some(m => m.name === prevBench)) {
+        benchSelect.value = prevBench;
+      }
+    }
+
+    function renderCatalog(catalog, installedModels) {
+      const installedSet = new Set((installedModels || []).map(m => m.name.toLowerCase()));
+      const box = document.getElementById('catalog-container');
+      box.innerHTML = (catalog || []).map(item => {
+        const isInstalled = installedSet.has(item.name.toLowerCase());
+        return `
+          <div class="model-card">
+            <div class="model-top">
+              <div>
+                <div class="model-name">${item.title}</div>
+                <div class="model-path">${item.repo_id}</div>
+              </div>
+              <span class="chip hi">${item.category}</span>
+            </div>
+            <p class="metric-sub">${item.desc}</p>
+            <div class="engine-chips">
+              <span class="chip">安装包: ~${item.size_gb} GB</span>
+              <span class="chip green">预计内存: ~${item.ram_est_gb} GB (≤16GB安全)</span>
+              <span class="chip hi">推荐: ${item.recommended_device}</span>
+            </div>
+            <div style="display:flex;justify-content:flex-end;margin-top:auto;padding-top:6px">
+              ${isInstalled
+                ? `<span class="chip green">✔ 已在本地仓库</span>`
+                : `<button class="btn btn-sm btn-primary" onclick="downloadFromCatalog('${item.repo_id}', '${item.recommended_device}')">⬇ 一键从魔搭高速下载</button>`
+              }
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderDownloads(downloads) {
+      const card = document.getElementById('downloads-card');
+      const list = document.getElementById('downloads-list');
+      if (!downloads || downloads.length === 0) {
+        card.style.display = 'none';
+        return;
+      }
+      card.style.display = 'flex';
+      list.innerHTML = downloads.map(d => `
+        <div style="background:rgba(30,41,59,0.7);padding:12px;border-radius:8px;border:1px solid var(--border)">
+          <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:6px">
+            <span>${d.repo_id} (${d.source}) — ${d.status.toUpperCase()}</span>
+            <span>${d.downloaded_mb} / ${d.total_mb} MB (${d.speed_mbps} MB/s) · ${d.progress_pct}%</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width:${d.progress_pct}%;background:linear-gradient(90deg,#0ea5e9,#10b981)"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:12px;color:var(--text-2)">
+            <span>${d.error ? ('❌ ' + d.error) : d.current_file}</span>
+            ${d.status === 'downloading' ? `<button class="btn btn-sm btn-danger" onclick="cancelDownload('${d.job_id}')">取消下载</button>` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function fetchOverview() {
+      try {
+        const data = await apiCall('/api/overview');
+        latestState = data;
+        const srv = data.server;
+        const tel = data.telemetry.current;
+
+        // Top bar server status
+        const dot = document.getElementById('srv-dot');
+        const stTxt = document.getElementById('srv-status-text');
+        if (srv.running) {
+          dot.className = 'dot running';
+          stTxt.textContent = srv.api_ready
+            ? `运行中 (PID: ${srv.pids.join(',')} · 已运行 ${Math.floor(srv.uptime_seconds / 60)}m${srv.uptime_seconds % 60}s)`
+            : `正在初始化模型 (PID: ${srv.pids.join(',')})`;
+        } else {
+          dot.className = 'dot stopped';
+          stTxt.textContent = '已停止 (0 内存占用)';
+        }
+        document.getElementById('btn-start').disabled = srv.running;
+        document.getElementById('btn-stop').disabled = !srv.running;
+        document.getElementById('cache-size-badge').textContent = `${srv.cache_size_mb} MB`;
+
+        // CPU
+        document.getElementById('cpu-pct').textContent = `${tel.cpu.utilization_pct.toFixed(1)}%`;
+        document.getElementById('cpu-bar').style.width = `${tel.cpu.utilization_pct}%`;
+        document.getElementById('cpu-freq').textContent = `${tel.cpu.freq_mhz} MHz`;
+        document.getElementById('cpu-cores').textContent = `${tel.cpu.cores_physical}核 ${tel.cpu.cores_logical}线程`;
+        document.getElementById('cpu-name').textContent = tel.cpu.name;
+
+        const customVramGb = Number(srv.settings?.shared_vram_gb ?? srv.settings?.ram_budget_gb ?? 16.0) || 16.0;
+        const vramLabel = Number.isInteger(customVramGb) ? `${customVramGb}` : customVramGb.toFixed(1);
+
+        // GPU
+        if (tel.gpus && tel.gpus.length > 0) {
+          const g = tel.gpus[0];
+          document.getElementById('gpu-pct').textContent = `${g.utilization_pct.toFixed(1)}%`;
+          document.getElementById('gpu-bar').style.width = `${g.utilization_pct}%`;
+          document.getElementById('gpu-name').textContent = g.name;
+          document.getElementById('gpu-ovms-chip').textContent = `OVMS 核显占用: ${g.ovms_utilization_pct.toFixed(1)}%`;
+          document.getElementById('gpu-vram-text').textContent = `共享显存: ${(g.shared_used_mb / 1024).toFixed(2)} / ${vramLabel} GB`;
+          const hwHint = document.getElementById('vram-hw-hint');
+          if (hwHint) {
+            hwHint.textContent = `Windows 硬件探测到的最大共享显存上限: ${(g.shared_total_mb / 1024).toFixed(1)} GB (系统总物理内存: ${tel.memory.total_gb.toFixed(1)} GB)`;
+          }
+          const engEntries = Object.entries(g.engines || {});
+          document.getElementById('gpu-engines').innerHTML = engEntries.length
+            ? engEntries.map(([k, v]) => `<span class="chip">${k}: ${v}%</span>`).join('')
+            : `<span class="chip">3D/Compute 空闲</span>`;
+        }
+
+        // NPU
+        if (tel.npu_present && tel.npus.length > 0) {
+          const n = tel.npus[0];
+          document.getElementById('npu-pct').textContent = `${n.utilization_pct.toFixed(1)}%`;
+          document.getElementById('npu-bar').style.width = `${n.utilization_pct}%`;
+          document.getElementById('npu-sub-status').textContent = n.name;
+          document.getElementById('npu-badge').textContent = '硬件已连接';
+          document.getElementById('npu-badge').className = 'chip green';
+        } else {
+          document.getElementById('npu-pct').textContent = 'N/A';
+          document.getElementById('npu-sub-status').textContent = '当前 CPU 无内置 NPU';
+          document.getElementById('npu-badge').textContent = '13代酷睿无 NPU (MCDM就绪)';
+        }
+
+        // RAM & Custom Shared VRAM Budget
+        document.getElementById('ram-used').textContent = `${tel.memory.used_gb.toFixed(1)} GB`;
+        document.getElementById('ram-total').textContent = `/ ${tel.memory.total_gb.toFixed(1)} GB (${tel.memory.utilization_pct}%)`;
+        document.getElementById('ram-bar').style.width = `${tel.memory.utilization_pct}%`;
+        document.getElementById('ovms-ram-chip').textContent = `OVMS 独占: ${tel.memory.ovms_ram_gb.toFixed(2)} GB`;
+        const ramCardTitle = document.getElementById('ram-card-title');
+        if (ramCardTitle) ramCardTitle.textContent = `系统内存 & OVMS ${vramLabel}GB 共享显存预算`;
+        const remain = Math.max(0, customVramGb - tel.memory.ovms_ram_gb);
+        document.getElementById('ram-budget-text').textContent =
+          `${vramLabel}GB 共享显存预算已用 ${tel.memory.ovms_ram_gb.toFixed(2)} GB · 剩余安全裕量 ${remain.toFixed(2)} GB`;
+
+        const vramSettingInput = document.getElementById('setting-shared-vram-gb');
+        if (vramSettingInput && document.activeElement !== vramSettingInput) {
+          vramSettingInput.value = customVramGb;
+        }
+        const idleSettingSelect = document.getElementById('setting-idle-min');
+        if (idleSettingSelect && document.activeElement !== idleSettingSelect && srv.settings?.idle_auto_stop_minutes !== undefined) {
+          idleSettingSelect.value = String(srv.settings.idle_auto_stop_minutes);
+        }
+
+        const curRoot = (srv.settings?.models_root || './models').replace(/\\/g, '/');
+        const rootLabel = document.getElementById('current-models-root-label');
+        if (rootLabel) rootLabel.textContent = curRoot;
+        const cacheDirLabel = document.getElementById('cache-dir-label');
+        if (cacheDirLabel && srv.settings?.cache_dir) cacheDirLabel.textContent = srv.settings.cache_dir;
+
+        renderUpdaterUI(srv.updater, srv.settings);
+        renderTelemetryChart(data.telemetry.history);
+        renderModels(data.models);
+        renderCatalog(data.catalog, data.models);
+        renderDownloads(data.downloads);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function getModelByIdx(idx) {
+      return (latestState?.models || [])[idx] || null;
+    }
+
+    function toggleModelByIdx(idx, enabled) {
+      const m = getModelByIdx(idx);
+      if (m) toggleModel(m.name, enabled);
+    }
+
+    function openParamModalByIdx(idx) {
+      const m = getModelByIdx(idx);
+      if (m) openParamModal(m.name);
+    }
+
+    async function openExplorerByIdx(idx) {
+      const m = getModelByIdx(idx);
+      if (!m) return;
+      const res = await apiCall('/api/models/open-folder', 'POST', { path: m.base_path, model_name: m.name });
+      if (res.ok) {
+        showToast(`已在 Windows 资源管理器中打开: ${res.path || m.base_path}`);
+      } else {
+        showToast(res.error || '打开目录失败');
+      }
+    }
+
+    async function openRootExplorer() {
+      const rootPath = latestState?.server?.settings?.models_root || './models';
+      const res = await apiCall('/api/models/open-folder', 'POST', { path: rootPath });
+      if (res.ok) {
+        showToast(`已在资源管理器中打开根目录: ${res.path || rootPath}`);
+      } else {
+        showToast(res.error || '打开根目录失败');
+      }
+    }
+
+    function quickTestModelByIdx(idx) {
+      const m = getModelByIdx(idx);
+      if (m) quickTestModel(m.name);
+    }
+
+    function openDeleteModalByIdx(idx) {
+      const m = getModelByIdx(idx);
+      if (!m) return;
+      document.getElementById('delete-model-name').value = m.name;
+      document.getElementById('delete-model-label').textContent = m.name;
+      document.getElementById('delete-model-path').textContent = `所在路径: ${m.base_path}`;
+      document.getElementById('delete-model-size').textContent = m.size_gb ?? 0;
+      document.getElementById('delete-modal').classList.add('open');
+    }
+
+    function closeDeleteModal() {
+      document.getElementById('delete-modal').classList.remove('open');
+    }
+
+    async function confirmDeleteModel(deleteFiles) {
+      const name = document.getElementById('delete-model-name').value;
+      if (!name) return;
+      if (deleteFiles) {
+        if (!confirm(`⚠️ 高危确认：确定要永久删除硬盘上的模型文件夹 "${name}" 吗？此操作不可恢复！`)) return;
+      }
+      closeDeleteModal();
+      showToast(deleteFiles ? `正在卸载并删除 ${name} 本地文件...` : `正在从列表中移除 ${name}...`);
+      const res = await apiCall(`/api/models/${encodeURIComponent(name)}?delete_files=${deleteFiles}`, 'DELETE');
+      if (res.ok) {
+        if (deleteFiles) {
+          showToast(res.delete_error ? `已移除列表项，但部分文件删除失败: ${res.delete_error}` : `✔ 已彻底删除模型 ${name} 及本地文件`);
+        } else {
+          showToast(`✔ 已从列表中移除 ${name}（本地文件已保留）`);
+        }
+        fetchOverview();
+      } else {
+        showToast(res.error || '移除失败');
+      }
+    }
+
+    function openRelocateModalByIdx(idx) {
+      const m = getModelByIdx(idx);
+      if (!m) return;
+      document.getElementById('relocate-model-name').value = m.name;
+      document.getElementById('relocate-modal-title').textContent = `📍 自定义模型所在位置 — ${m.name}`;
+      document.getElementById('relocate-old-path').value = m.base_path;
+      document.getElementById('relocate-new-path').value = m.base_path;
+      document.getElementById('relocate-move-files').checked = false;
+      document.getElementById('relocate-modal').classList.add('open');
+    }
+
+    function closeRelocateModal() {
+      document.getElementById('relocate-modal').classList.remove('open');
+    }
+
+    async function browseRelocateFolder() {
+      const cur = document.getElementById('relocate-new-path').value || document.getElementById('relocate-old-path').value;
+      const res = await apiCall('/api/models/browse', 'POST', {
+        initial_dir: cur,
+        title: '选择模型新的存放文件夹路径',
+      });
+      if (res.path) {
+        document.getElementById('relocate-new-path').value = res.path;
+      }
+    }
+
+    async function confirmRelocateModel() {
+      const name = document.getElementById('relocate-model-name').value;
+      const newPath = document.getElementById('relocate-new-path').value.trim();
+      const moveFiles = document.getElementById('relocate-move-files').checked;
+      if (!newPath) return showToast('请输入或浏览选择新的模型文件夹路径');
+
+      const btn = document.getElementById('btn-confirm-relocate');
+      btn.disabled = true;
+      showToast(moveFiles ? `正在迁移 ${name} 模型文件到新位置，请稍候...` : `正在更新 ${name} 路径...`);
+      try {
+        const res = await apiCall(`/api/models/${encodeURIComponent(name)}/relocate`, 'POST', {
+          new_path: newPath,
+          move_files: moveFiles,
+        });
+        if (res.ok) {
+          showToast(`✔ 模型 ${name} 位置已更新为: ${res.new_path}`);
+          closeRelocateModal();
+          fetchOverview();
+        } else {
+          showToast(res.error || '更改位置失败', 4500);
+        }
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function openRootDirModal() {
+      const curRoot = latestState?.server?.settings?.models_root || './models';
+      document.getElementById('rootdir-input').value = curRoot;
+      document.getElementById('rootdir-modal').classList.add('open');
+    }
+
+    function closeRootDirModal() {
+      document.getElementById('rootdir-modal').classList.remove('open');
+    }
+
+    async function browseGlobalRootFolder() {
+      const cur = document.getElementById('rootdir-input').value;
+      const res = await apiCall('/api/models/browse', 'POST', {
+        initial_dir: cur,
+        title: '选择默认模型库根目录',
+      });
+      if (res.path) {
+        document.getElementById('rootdir-input').value = res.path;
+      }
+    }
+
+    async function saveRootDirModal() {
+      const newRoot = document.getElementById('rootdir-input').value.trim();
+      if (!newRoot) return showToast('请输入有效的根目录路径');
+      const res = await apiCall('/api/settings', 'POST', { models_root: newRoot });
+      if (res.ok) {
+        showToast(`✔ 默认模型库根目录已更新为: ${res.settings.models_root}`);
+        closeRootDirModal();
+        fetchOverview();
+      } else {
+        showToast(res.error || '更新根目录失败');
+      }
+    }
+
+    async function browseDownloadDestRoot() {
+      const cur = document.getElementById('dl-dest-root').value || latestState?.server?.settings?.models_root;
+      const res = await apiCall('/api/models/browse', 'POST', {
+        initial_dir: cur,
+        title: '选择模型下载保存的目标根目录',
+      });
+      if (res.path) {
+        document.getElementById('dl-dest-root').value = res.path;
+      }
+    }
+
+    async function toggleModel(name, enabled) {
+      showToast(`${enabled ? '正在启用' : '正在停用'}模型 ${name}...`);
+      const res = await apiCall('/api/models/toggle', 'POST', { model_name: name, enabled });
+      if (res.ok) {
+        showToast(`${name} 已${enabled ? '启用并通知 OVMS 热加载' : '停用并释放资源'}`);
+        fetchOverview();
+      } else {
+        showToast(res.error || '操作失败');
+      }
+    }
+
+    async function scanModels(clearExcluded = false) {
+      const rootDir = latestState?.server?.settings?.models_root || './models';
+      showToast(`正在扫描 ${rootDir} 模型目录...`);
+      await apiCall(`/api/models/scan?clear_excluded=${clearExcluded}`, 'POST');
+      await fetchOverview();
+      showToast('扫描与同步完成！');
+    }
+
+    async function openExplorer(path) {
+      const res = await apiCall('/api/models/open-folder', 'POST', { path });
+      if (!res.ok) showToast(res.error || '打开目录失败');
+    }
+
+    async function openParamModal(name) {
+      const res = await apiCall(`/api/models/${encodeURIComponent(name)}/pbtxt`);
+      if (!res.ok) return showToast(res.error || '加载配置失败');
+      document.getElementById('modal-model-name').value = name;
+      document.getElementById('modal-title').textContent = `⚙ 调整模型参数 — ${name}`;
+      const p = res.params || {};
+      document.getElementById('p-device').value = p.device || 'GPU';
+      document.getElementById('p-kv-prec').value = p.kv_cache_precision || 'f16';
+      document.getElementById('p-max-seqs').value = p.max_num_seqs ?? 256;
+      document.getElementById('p-cache-size').value = p.cache_size ?? 0;
+      document.getElementById('p-perf-hint').value = p.performance_hint || '';
+      document.getElementById('p-pipe-type').value = p.pipeline_type || 'AUTO';
+      document.getElementById('p-prefix-cache').value = String(p.enable_prefix_caching !== false);
+      document.getElementById('p-split-fuse').value = String(p.dynamic_split_fuse !== false);
+      document.getElementById('p-use-raw').checked = false;
+      document.getElementById('p-raw-pbtxt').value = res.pbtxt || '';
+      document.getElementById('param-modal').classList.add('open');
+    }
+
+    function closeParamModal() {
+      document.getElementById('param-modal').classList.remove('open');
+    }
+
+    function collectModalParams() {
+      return {
+        device: document.getElementById('p-device').value,
+        kv_cache_precision: document.getElementById('p-kv-prec').value,
+        max_num_seqs: Number(document.getElementById('p-max-seqs').value || 256),
+        cache_size: Number(document.getElementById('p-cache-size').value || 0),
+        performance_hint: document.getElementById('p-perf-hint').value,
+        pipeline_type: document.getElementById('p-pipe-type').value,
+        enable_prefix_caching: document.getElementById('p-prefix-cache').value === 'true',
+        dynamic_split_fuse: document.getElementById('p-split-fuse').value === 'true',
+      };
+    }
+
+    function previewGeneratedPbtxt() {
+      if (document.getElementById('p-use-raw').checked) return;
+      const p = collectModalParams();
+      const pc = {};
+      if (p.kv_cache_precision && p.kv_cache_precision !== 'default') pc.KV_CACHE_PRECISION = p.kv_cache_precision;
+      if (p.performance_hint) pc.PERFORMANCE_HINT = p.performance_hint;
+      const pcLine = Object.keys(pc).length ? `\n      plugin_config: '${JSON.stringify(pc)}'` : '';
+      const csLine = p.cache_size > 0 ? `\n      cache_size: ${p.cache_size},` : '';
+      const ptLine = p.pipeline_type !== 'AUTO' ? `\n      pipeline_type: "${p.pipeline_type}",` : '';
+      document.getElementById('p-raw-pbtxt').value = `input_stream: "HTTP_REQUEST_PAYLOAD:input"
+output_stream: "HTTP_RESPONSE_PAYLOAD:output"
+node: {
+  name: "LLMExecutor"
+  calculator: "HttpLLMCalculator"
+  input_stream: "LOOPBACK:loopback"
+  input_stream: "HTTP_REQUEST_PAYLOAD:input"
+  input_side_packet: "LLM_NODE_RESOURCES:llm"
+  output_stream: "LOOPBACK:loopback"
+  output_stream: "HTTP_RESPONSE_PAYLOAD:output"
+  input_stream_info: {
+    tag_index: 'LOOPBACK:0',
+    back_edge: true
+  }
+  node_options: {
+    [type.googleapis.com / mediapipe.LLMCalculatorOptions]: {
+      models_path: "./",
+      device: "${p.device}",
+      max_num_seqs: ${p.max_num_seqs},
+      enable_prefix_caching: ${p.enable_prefix_caching},
+      dynamic_split_fuse: ${p.dynamic_split_fuse},${csLine}${ptLine}${pcLine}
+    }
+  }
+  input_stream_handler {
+    input_stream_handler: "SyncSetInputStreamHandler",
+    options {
+      [mediapipe.SyncSetInputStreamHandlerOptions.ext] {
+        sync_set {
+          tag_index: "LOOPBACK:0"
+        }
+      }
+    }
+  }
+}`;
+    }
+
+    async function saveModelParams() {
+      const name = document.getElementById('modal-model-name').value;
+      const useRaw = document.getElementById('p-use-raw').checked;
+      const body = {
+        params: collectModalParams(),
+        raw_pbtxt: useRaw ? document.getElementById('p-raw-pbtxt').value : null,
+      };
+      const res = await apiCall(`/api/models/${encodeURIComponent(name)}/params`, 'POST', body);
+      if (res.ok) {
+        showToast(`已保存 ${name} 的参数并通知 OVMS 更新！`);
+        closeParamModal();
+        fetchOverview();
+      } else {
+        showToast(res.error || '保存失败');
+      }
+    }
+
+    async function browseLocalFolder() {
+      const res = await apiCall('/api/models/browse', 'POST');
+      if (res.path) {
+        document.getElementById('import-folder-path').value = res.path;
+      }
+    }
+
+    async function submitImportModel() {
+      const path = document.getElementById('import-folder-path').value.trim();
+      if (!path) return showToast('请先输入或浏览选择模型文件夹路径');
+      const customName = document.getElementById('import-custom-name').value.trim() || null;
+      const device = document.getElementById('import-device').value;
+      const res = await apiCall('/api/models/import', 'POST', {
+        folder_path: path,
+        custom_name: customName,
+        enable: true,
+        default_device: device,
+      });
+      if (res.ok) {
+        showToast(`成功导入模型: ${res.model.name}`);
+        switchTab('dashboard', document.querySelectorAll('.tab-btn')[0]);
+        fetchOverview();
+      } else {
+        showToast(res.error || '导入失败');
+      }
+    }
+
+    async function startCustomDownload() {
+      const repoId = document.getElementById('dl-repo-id').value.trim();
+      if (!repoId) return showToast('请输入模型仓库 ID');
+      const source = document.getElementById('dl-source').value;
+      const device = document.getElementById('dl-device').value;
+      const destRoot = document.getElementById('dl-dest-root').value.trim() || null;
+      const res = await apiCall('/api/downloads/start', 'POST', {
+        repo_id: repoId,
+        source,
+        target_device: device,
+        auto_enable: true,
+        dest_root: destRoot,
+      });
+      if (res.ok) {
+        showToast(`已开始下载: ${repoId} → ${res.job.dest_dir}`);
+        fetchOverview();
+      } else {
+        showToast(res.error || '启动下载失败');
+      }
+    }
+
+    async function downloadFromCatalog(repoId, device) {
+      const destRoot = document.getElementById('dl-dest-root').value.trim() || null;
+      const res = await apiCall('/api/downloads/start', 'POST', {
+        repo_id: repoId,
+        source: 'modelscope',
+        target_device: device || 'GPU',
+        auto_enable: true,
+        dest_root: destRoot,
+      });
+      if (res.ok) {
+        showToast(`已开始从阿里魔搭高速下载 ${repoId} → ${res.job.dest_dir}`);
+        fetchOverview();
+      }
+    }
+
+    async function cancelDownload(jobId) {
+      await apiCall(`/api/downloads/${jobId}/cancel`, 'POST');
+      fetchOverview();
+    }
+
+    function quickTestModel(name) {
+      switchTab('playground', document.querySelectorAll('.tab-btn')[2]);
+      document.getElementById('bench-model').value = name;
+    }
+
+    async function runBenchmark() {
+      const model = document.getElementById('bench-model').value;
+      if (!model) return showToast('请先启用至少一个模型并启动服务');
+      const prompt = document.getElementById('bench-prompt').value.trim();
+      const max_tokens = Number(document.getElementById('bench-max-tokens').value || 256);
+      const temperature = Number(document.getElementById('bench-temp').value || 0.7);
+
+      const outBox = document.getElementById('bench-output');
+      const btn = document.getElementById('btn-run-bench');
+      outBox.textContent = '';
+      btn.disabled = true;
+      document.getElementById('bench-status').textContent = '正在流式推理测速...';
+
+      try {
+        const res = await fetch('/api/chat/benchmark', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model, prompt, max_tokens, temperature }),
+        });
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          const lines = buf.split('\n');
+          buf = lines.pop();
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            const evt = JSON.parse(line);
+            if (evt.type === 'delta') {
+              outBox.textContent += evt.content;
+              outBox.scrollTop = outBox.scrollHeight;
+              document.getElementById('metric-ttft').textContent = `首字延迟 (TTFT): ${evt.ttft_ms} ms`;
+              document.getElementById('metric-tps').textContent = `吐字速度: ${evt.tps} tokens/s`;
+              document.getElementById('metric-tokens').textContent = `生成词元: ${evt.tokens} tokens`;
+            } else if (evt.type === 'done') {
+              document.getElementById('metric-ttft').textContent = `首字延迟 (TTFT): ${evt.ttft_ms} ms`;
+              document.getElementById('metric-tps').textContent = `吐字速度: ${evt.tps} tokens/s`;
+              document.getElementById('metric-tokens').textContent = `生成词元: ${evt.tokens} tokens`;
+              document.getElementById('metric-total').textContent = `总耗时: ${evt.total_sec} s`;
+              document.getElementById('bench-status').textContent = '测速完成';
+            } else if (evt.type === 'error') {
+              outBox.textContent = `❌ 请求出错: ${evt.error}\n请确认顶部 OpenVINO 服务处于「运行中」且模型状态为 AVAILABLE。`;
+              document.getElementById('bench-status').textContent = '请求失败';
+            }
+          }
+        }
+      } catch (e) {
+        outBox.textContent = '请求异常: ' + e;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function refreshLogs() {
+      const res = await apiCall('/api/logs?lines=160');
+      const box = document.getElementById('ovms-log-box');
+      box.textContent = (res.stdout || '暂无日志') + (res.stderr ? `\n--- STDERR ---\n${res.stderr}` : '');
+      box.scrollTop = box.scrollHeight;
+      if (res.kv_cache) {
+        document.getElementById('kv-cache-pct').textContent = `${res.kv_cache.usage_pct}% / ${res.kv_cache.capacity}`;
+        document.getElementById('kv-cache-detail').textContent = `缓存模式: ${res.kv_cache.cache_type}`;
+      }
+    }
+
+    async function clearShaderCache() {
+      const res = await apiCall('/api/cache/clear', 'POST');
+      showToast(`已清理着色器编译缓存: ${res.cleared_mb} MB`);
+      fetchOverview();
+    }
+
+    async function saveGlobalSettings() {
+      const idleMin = Number(document.getElementById('setting-idle-min').value || 0);
+      const sharedVram = Number(document.getElementById('setting-shared-vram-gb')?.value || 16.0);
+      if (isNaN(sharedVram) || sharedVram < 1 || sharedVram > 128) {
+        return showToast('请输入有效的共享显存大小 (1 ~ 128 GB)');
+      }
+      await apiCall('/api/settings', 'POST', {
+        idle_auto_stop_minutes: idleMin,
+        shared_vram_gb: sharedVram,
+        ram_budget_gb: sharedVram,
+      });
+      showToast(`✔ 全局设置已保存（共享显存上限: ${sharedVram} GB）`);
+      fetchOverview();
+    }
+
+    function openVramModal() {
+      const cur = Number(latestState?.server?.settings?.shared_vram_gb ?? latestState?.server?.settings?.ram_budget_gb ?? 16.0) || 16.0;
+      document.getElementById('vram-modal-input').value = cur;
+      document.getElementById('vram-modal').classList.add('open');
+    }
+
+    function closeVramModal() {
+      document.getElementById('vram-modal').classList.remove('open');
+    }
+
+    function setVramPreset(gb) {
+      document.getElementById('vram-modal-input').value = gb;
+    }
+
+    async function saveVramModal() {
+      const val = Number(document.getElementById('vram-modal-input').value || 16.0);
+      if (isNaN(val) || val < 1 || val > 128) {
+        return showToast('请输入有效的共享显存大小 (1 ~ 128 GB)');
+      }
+      const res = await apiCall('/api/settings', 'POST', {
+        shared_vram_gb: val,
+        ram_budget_gb: val,
+      });
+      if (res.ok) {
+        showToast(`✔ 共享显存大小已更新为 ${res.settings.shared_vram_gb} GB`);
+        closeVramModal();
+        fetchOverview();
+      } else {
+        showToast(res.error || '保存失败');
+      }
+    }
+
+    function renderUpdaterUI(upd, settings) {
+      if (!upd) return;
+      const instVer = upd.installed?.ovms_version || '未知';
+      const chName = (upd.channel || settings?.update_channel || 'weekly') === 'weekly' ? 'Weekly' : 'Stable';
+
+      // Top bar badge & alert pill
+      const badge = document.getElementById('ovms-ver-badge');
+      if (badge) {
+        badge.textContent = upd.updating
+          ? `🔄 正在升级 (${upd.progress_pct || 0}%)`
+          : `OVMS ${instVer} (${chName})`;
+      }
+      const pill = document.getElementById('ovms-update-pill');
+      if (pill) {
+        if (upd.update_available && !upd.updating) {
+          pill.style.display = 'inline-flex';
+          pill.textContent = `⬆ 发现新版本 ${upd.remote?.ovms_version || ''}`;
+        } else {
+          pill.style.display = 'none';
+        }
+      }
+
+      // Logs tab summary card
+      const cardCh = document.getElementById('card-ovms-channel');
+      if (cardCh) cardCh.textContent = `${chName} 通道 · ${upd.auto_apply_updates ? '全自动更新' : (upd.auto_check_updates ? '自动检测/手动确认' : '纯手动模式')}`;
+      const cardSum = document.getElementById('card-ovms-ver-summary');
+      if (cardSum) {
+        const remVer = upd.remote?.ovms_version ? ` · 官方最新: ${upd.remote.ovms_version}` : '';
+        cardSum.textContent = `本地版本: ${instVer}${remVer}${upd.update_available ? ' (有可用更新！)' : ''}`;
+      }
+
+      // Modal elements
+      document.getElementById('upd-local-ver').textContent = instVer;
+      document.getElementById('upd-local-backend').textContent = `OpenVINO: ${upd.installed?.openvino_backend || '--'}`;
+      document.getElementById('upd-local-genai').textContent = `GenAI: ${upd.installed?.genai_backend || '--'}`;
+
+      const rem = upd.remote || {};
+      document.getElementById('upd-remote-ver').textContent = rem.ovms_version || (upd.checking ? '正在查询官方源...' : '待检测');
+      const remBadge = document.getElementById('upd-remote-badge');
+      if (upd.checking) {
+        remBadge.textContent = '检测中...';
+        remBadge.className = 'chip hi';
+      } else if (upd.update_available) {
+        remBadge.textContent = '发现新版本';
+        remBadge.className = 'chip warn';
+      } else if (rem.ovms_version) {
+        remBadge.textContent = '已是最新';
+        remBadge.className = 'chip green';
+      } else {
+        remBadge.textContent = '待检测';
+        remBadge.className = 'chip';
+      }
+
+      const metaParts = [];
+      if (rem.size_mb) metaParts.push(`安装包大小: ${rem.size_mb} MB`);
+      if (rem.published_at) metaParts.push(`构建时间: ${rem.published_at}`);
+      if (rem.sha256) metaParts.push(`SHA256: ${rem.sha256.slice(0, 12)}...`);
+      document.getElementById('upd-remote-meta').textContent = metaParts.length ? metaParts.join(' · ') : '支持官方 SHA256 完整性校验与配置无损升级';
+
+      const lastChkEl = document.getElementById('upd-last-checked');
+      if (upd.last_checked_ts > 0) {
+        const dt = new Date(upd.last_checked_ts * 1000).toLocaleString();
+        lastChkEl.textContent = `上次检测时间: ${dt} · ${upd.message || ''}`;
+      } else {
+        lastChkEl.textContent = '尚未执行在线检测';
+      }
+
+      // Progress & Error boxes
+      const progPanel = document.getElementById('upd-progress-panel');
+      if (upd.updating || upd.phase === 'completed') {
+        progPanel.style.display = 'block';
+        document.getElementById('upd-progress-msg').textContent = upd.message || '正在升级...';
+        document.getElementById('upd-progress-pct').textContent = `${upd.progress_pct || 0}%`;
+        document.getElementById('upd-progress-bar').style.width = `${upd.progress_pct || 0}%`;
+      } else {
+        progPanel.style.display = 'none';
+      }
+
+      const errBox = document.getElementById('upd-error-box');
+      if (upd.error) {
+        errBox.style.display = 'block';
+        errBox.textContent = `❌ ${upd.error}`;
+      } else {
+        errBox.style.display = 'none';
+      }
+
+      // Sync form controls only when modal is not actively being edited or on first open
+      const modalOpen = document.getElementById('updater-modal').classList.contains('open');
+      if (!modalOpen || !window._updFormSynced) {
+        document.getElementById('upd-channel-select').value = upd.channel || 'weekly';
+        document.getElementById('upd-interval-select').value = String(Math.round(upd.check_interval_hours || 6));
+        document.getElementById('upd-auto-check').checked = !!upd.auto_check_updates;
+        document.getElementById('upd-auto-apply').checked = !!upd.auto_apply_updates;
+        window._updFormSynced = true;
+      }
+
+      document.getElementById('btn-check-upd').disabled = !!upd.checking || !!upd.updating;
+      document.getElementById('btn-apply-upd').disabled = !!upd.updating;
+      document.getElementById('btn-force-reinstall').disabled = !!upd.updating;
+    }
+
+    function openUpdaterModal() {
+      window._updFormSynced = false;
+      document.getElementById('updater-modal').classList.add('open');
+      if (latestState?.server) {
+        renderUpdaterUI(latestState.server.updater, latestState.server.settings);
+      }
+      if (!latestState?.server?.updater?.last_checked_ts) {
+        triggerManualUpdateCheck();
+      }
+    }
+
+    function closeUpdaterModal() {
+      document.getElementById('updater-modal').classList.remove('open');
+    }
+
+    async function saveUpdaterSettings(recheckNow = false) {
+      const channel = document.getElementById('upd-channel-select').value;
+      const intervalHours = Number(document.getElementById('upd-interval-select').value || 6);
+      const autoCheck = document.getElementById('upd-auto-check').checked;
+      const autoApply = document.getElementById('upd-auto-apply').checked;
+
+      const res = await apiCall('/api/settings', 'POST', {
+        update_channel: channel,
+        check_interval_hours: intervalHours,
+        auto_check_updates: autoCheck,
+        auto_apply_updates: autoApply,
+      });
+      if (res.ok) {
+        showToast(`✔ 更新策略已保存（${autoApply ? '全自动无感更新' : (autoCheck ? '自动检测 + 手动确认升级' : '纯手动更新')}）`);
+        if (recheckNow) {
+          await triggerManualUpdateCheck();
+        } else {
+          fetchOverview();
+        }
+      }
+    }
+
+    async function triggerManualUpdateCheck() {
+      const ch = document.getElementById('upd-channel-select')?.value || latestState?.server?.settings?.update_channel || 'weekly';
+      showToast(`正在连接官方源检测 OpenVINO (${ch}) 最新版本...`);
+      const res = await apiCall('/api/ovms/updater/check', 'POST', { channel: ch, force: true });
+      await fetchOverview();
+      if (res.ok) {
+        showToast(res.update_available ? `🎉 发现新版本: ${res.remote?.ovms_version}` : `✔ 当前已是最新版本 (${res.installed?.ovms_version})`);
+      } else {
+        showToast(res.error || '版本检测失败', 4000);
+      }
+    }
+
+    async function triggerManualUpdateApply(forceReinstall = false) {
+      const ch = document.getElementById('upd-channel-select')?.value || latestState?.server?.settings?.update_channel || 'weekly';
+      if (forceReinstall) {
+        if (!confirm('确定要从官方源重新下载并覆盖安装当前通道的最新 OpenVINO 组件吗？（您的所有模型与配置均会完好保留）')) return;
+      }
+      showToast('正在启动 OpenVINO 在线升级任务...');
+      const res = await apiCall('/api/ovms/updater/apply', 'POST', {
+        channel: ch,
+        force_reinstall: forceReinstall,
+      });
+      await fetchOverview();
+      if (res.already_latest && !forceReinstall) {
+        showToast(res.message || '当前已是最新版本，如需重装可点击左侧「强制重装/修复」');
+      } else if (res.ok) {
+        showToast('🚀 已开始后台下载并升级 OpenVINO，可在面板实时查看进度');
+      } else {
+        showToast(res.error || '启动更新失败', 4500);
+      }
+    }
+
+    fetchOverview();
+    setInterval(fetchOverview, 1500);
+  </script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+# Python bytecode & virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# Local user runtime state & logs (may contain local file paths)
+studio_state.json
+*.log
+
+# OVMS online updater staging & downloaded packages
+ovms_update_*.zip
+ovms_update_*.zip.part
+ovms_update_staging/
+ovms_cache/
+
+# Local models directory (if placed inside repo)
+models/
+
+# OS / Editor artifacts
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
